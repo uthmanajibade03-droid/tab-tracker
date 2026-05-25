@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tab Tracker — Icon Generator</title>
+<style>
+  body { font: 14px system-ui, sans-serif; padding: 32px; max-width: 600px; margin: 0 auto; color: #222; }
+  h1 { margin: 0 0 8px; }
+  p { color: #555; line-height: 1.5; }
+  .previews { display: flex; gap: 24px; align-items: flex-end; margin: 24px 0; flex-wrap: wrap; }
+  .preview { text-align: center; }
+  .preview canvas { display: block; margin: 0 auto 6px; background: #fafafa; image-rendering: pixelated; box-shadow: 0 0 0 1px #ddd; }
+  .preview .label { font-size: 11px; color: #888; }
+  button { font: inherit; padding: 10px 18px; background: #06c; color: #fff; border: 0; border-radius: 6px; cursor: pointer; font-weight: 500; }
+  button:hover { background: #05a; }
+  .steps { background: #f5f5f7; padding: 16px 20px; border-radius: 8px; margin-top: 24px; }
+  .steps ol { margin: 8px 0 0; padding-left: 20px; }
+  .steps li { margin: 4px 0; }
+</style>
+</head>
+<body>
+  <h1>Tab Tracker Icons</h1>
+  <p>Generates PNG icons at the four sizes Chrome Web Store requires.</p>
+
+  <div class="previews" id="previews"></div>
+
+  <button id="dl">Download all 4 PNGs</button>
+
+  <div class="steps">
+    <strong>Then:</strong>
+    <ol>
+      <li>Move the 4 downloaded files into this <code>icons/</code> folder.</li>
+      <li>Make sure the filenames are exactly <code>16.png</code>, <code>32.png</code>, <code>48.png</code>, <code>128.png</code>.</li>
+      <li>Reload the extension at <code>chrome://extensions</code> — the new icon should appear in the toolbar.</li>
+    </ol>
+  </div>
+
+<script>
+const SIZES = [16, 32, 48, 128];
+
+function drawIcon(canvas, s) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.height = s;
+
+  // Rounded background
+  const r = s * 0.22;
+  ctx.fillStyle = '#0f0f12';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(0, 0, s, s, r);
+  else ctx.rect(0, 0, s, s);
+  ctx.fill();
+
+  // Stopwatch crown (top stem)
+  const cx = s / 2;
+  const cy = s * 0.57;
+  const rad = s * 0.31;
+  ctx.fillStyle = '#fff';
+  const cw = s * 0.13, ch = s * 0.09;
+  ctx.fillRect(cx - cw / 2, cy - rad - ch * 0.85, cw, ch);
+
+  // Stopwatch body (white circle)
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tick marks at 12/3/6/9 (only on larger sizes)
+  if (s >= 32) {
+    ctx.fillStyle = '#0f0f12';
+    const tickLen = s * 0.05;
+    const tickW = Math.max(1, s * 0.025);
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * Math.PI / 2) - Math.PI / 2;
+      const x = cx + Math.cos(angle) * (rad - tickLen / 2 - s * 0.02);
+      const y = cy + Math.sin(angle) * (rad - tickLen / 2 - s * 0.02);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle + Math.PI / 2);
+      ctx.fillRect(-tickW / 2, -tickLen / 2, tickW, tickLen);
+      ctx.restore();
+    }
+  }
+
+  // Hand pointing to ~2 o'clock
+  ctx.strokeStyle = '#0f0f12';
+  ctx.lineWidth = Math.max(1.5, s * 0.06);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  const angle = -Math.PI / 2 + Math.PI / 3;
+  ctx.lineTo(cx + Math.cos(angle) * rad * 0.7, cy + Math.sin(angle) * rad * 0.7);
+  ctx.stroke();
+
+  // Center dot
+  ctx.fillStyle = '#0f0f12';
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(1, s * 0.05), 0, Math.PI * 2);
+  ctx.fill();
+}
+
+const previews = document.getElementById('previews');
+const canvases = {};
+for (const s of SIZES) {
+  const wrap = document.createElement('div');
+  wrap.className = 'preview';
+  const c = document.createElement('canvas');
+  drawIcon(c, s);
+  canvases[s] = c;
+  wrap.appendChild(c);
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = `${s}.png`;
+  wrap.appendChild(label);
+  previews.appendChild(wrap);
+}
+
+document.getElementById('dl').addEventListener('click', async () => {
+  for (const s of SIZES) {
+    const blob = await new Promise(res => canvases[s].toBlob(res, 'image/png'));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${s}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    await new Promise(r => setTimeout(r, 150));
+  }
+});
+</script>
+</body>
+</html>

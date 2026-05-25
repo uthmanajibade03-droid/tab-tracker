@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tab Tracker · Dashboard</title>
+<style>
+  :root { --bg: #fafafa; --fg: #222; --muted: #888; --line: #e5e5e5; --accent: #06c; }
+  * { box-sizing: border-box; }
+  body { font: 14px system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+  header { padding: 24px 32px; border-bottom: 1px solid var(--line); background: #fff; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); background: #fff; border-radius: 4px; cursor: pointer; }
+  button.danger { color: #b00; border-color: #f3c4c4; }
+  button:hover { background: #f0f0f0; }
+  main { padding: 24px 32px; max-width: 960px; margin: 0 auto; }
+  .summary { display: flex; gap: 32px; margin-bottom: 20px; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; flex: 1; }
+  .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .value { font-size: 22px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  th { background: #fafafa; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th .arrow { display: inline-block; width: 8px; color: var(--accent); }
+  .bar { display: inline-block; height: 6px; background: var(--accent); border-radius: 3px; vertical-align: middle; margin-left: 8px; opacity: 0.7; }
+  .empty { text-align: center; padding: 48px; color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Tab Tracker</h1>
+    <div class="controls">
+      <label>Day: <select id="day"></select></label>
+      <button id="export">Export JSON</button>
+      <button id="clear" class="danger">Clear all</button>
+    </div>
+  </header>
+  <main>
+    <div class="summary">
+      <div class="stat"><div class="label">Sites</div><div class="value" id="s-sites">—</div></div>
+      <div class="stat"><div class="label">Visits</div><div class="value" id="s-visits">—</div></div>
+      <div class="stat"><div class="label">Active time</div><div class="value" id="s-active">—</div></div>
+    </div>
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th data-sort="domain">Site <span class="arrow"></span></th>
+          <th class="num" data-sort="opens">Visits <span class="arrow"></span></th>
+          <th class="num" data-sort="activeMs">Active time <span class="arrow">▼</span></th>
+          <th class="num">Share</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No activity tracked for this day.</div>
+  </main>
+  <script src="dashboard.js"></script>
+</body>
+</html>
