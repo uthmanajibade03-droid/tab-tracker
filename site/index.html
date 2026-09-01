@@ -281,7 +281,7 @@
           <h3>Desktop pill</h3>
           <p class="desc">Tracks time per application across your whole computer, not just the browser.</p>
           <a class="btn" href="https://github.com/uthmanajibade03-droid/tab-tracker/releases/latest/download/TabTracker-Setup.exe">Download for Windows</a>
-          <p class="note">Run the installer. The pill appears on top of your windows and starts counting.</p>
+          <p class="note" id="dl-note">Run the installer. The pill appears on top of your windows and starts counting.</p>
         </div>
 
         <div class="card">
@@ -315,6 +315,31 @@
 </footer>
 
 <script>
+/*
+ * The pill is Windows-only for now. A Mac visitor clicking "Download for
+ * Windows" gets a file their machine cannot open, so say so plainly rather
+ * than letting them find out after a 100MB download. The extension does work
+ * on macOS, so point them at the half they can actually use.
+ */
+(function () {
+  var isMac = /Mac|iPhone|iPad/.test(navigator.platform || '') ||
+              /Mac OS X/.test(navigator.userAgent || '');
+  if (!isMac) return;
+  var btn = document.querySelector('.card .btn');
+  var note = document.getElementById('dl-note');
+  if (btn) {
+    btn.textContent = 'Windows only for now';
+    btn.setAttribute('aria-disabled', 'true');
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--muted)';
+    btn.style.boxShadow = 'inset 0 0 0 1px var(--line)';
+    btn.removeAttribute('href');
+  }
+  if (note) {
+    note.textContent = "The desktop pill doesn't run on macOS yet. The browser extension does — grab that instead.";
+  }
+})();
+
 (function () {
   var el = document.getElementById('t');
   if (!el) return;

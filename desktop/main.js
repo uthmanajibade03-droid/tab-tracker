@@ -27,6 +27,7 @@ const { spawn } = require('child_process');
 const prayer = require('./prayer');
 const updater = require('./updater');
 const voice = require('./voice');
+const { watcherCommand, BROWSER_PROCESSES } = require('./focus-source');
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -88,12 +89,6 @@ function pillHeightFor(width) {
 const MAX_PANEL_HEIGHT = 560;
 
 const SCREEN_MARGIN = 24;
-
-// Raw process names (lowercased) whose foreground time may be attributed to a
-// web domain reported by the browser extension over the bridge.
-const BROWSER_PROCESSES = new Set([
-  'chrome', 'msedge', 'firefox', 'brave', 'opera', 'vivaldi', 'arc', 'chromium',
-]);
 
 /*
  * Win32 class names of the Windows desktop itself.
@@ -180,17 +175,6 @@ const FRIENDLY_NAMES = new Map(Object.entries({
 
 let statsPath;   // <userData>/stats.json
 let uiStatePath; // <userData>/ui-state.json — pill position, size, opacity, paused
-
-/*
- * In a packaged build the app source lives inside app.asar, and Windows cannot
- * execute a .ps1 from inside that archive. Fall back to the unpacked resources
- * directory, which is where the script must be shipped via extraResources.
- */
-function resolveWatcherScript() {
-  const inSource = path.join(__dirname, 'focus-watcher.ps1');
-  if (!__dirname.includes('app.asar')) return inSource;
-  return path.join(process.resourcesPath, 'focus-watcher.ps1');
-}
 
 // ---------------------------------------------------------------------------
 // Stats store
@@ -625,15 +609,13 @@ function onFocusSample(sample) {
 }
 
 function startWatcher() {
-  const script = resolveWatcherScript();
-  if (!fs.existsSync(script)) {
-    console.error('[watcher] focus-watcher.ps1 not found at', script);
-    return;
-  }
+  const source = watcherCommand();
+  if (!source) return; // unsupported platform, or the helper is missing
 
-  watcher = spawn('powershell.exe', [
-    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script,
-  ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  watcher = spawn(source.command, source.args, {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   watcher.stdout.setEncoding('utf8');
 
