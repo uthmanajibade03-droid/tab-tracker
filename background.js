@@ -690,6 +690,9 @@ function bridgeConnect() {
   sock.addEventListener('open', () => {
     bridgeRetryMs = BRIDGE_RETRY_MIN_MS; // reset backoff after a success
     console.log('[Tab Tracker] desktop pill bridge connected');
+    /* Send history straight away so a window opened before the browser was
+       running doesn't sit empty until the next throttle window. */
+    bridgeSendStats(true);
   });
   sock.addEventListener('close', () => {
     if (bridgeSocket === sock) bridgeSocket = null;
@@ -720,6 +723,23 @@ function bridgeSendDomain(domain, activeMs) {
   try {
     bridgeSocket.send(JSON.stringify({ type: 'domain', domain, activeMs }));
   } catch { /* socket died mid-send; close handler will reconnect */ }
+}
+
+/* Push the full per-day history so the desktop app's stats window can show
+   sites beside applications. Sent on connect and then throttled — this is a
+   whole-history payload, not a heartbeat, and it only has to be fresh enough
+   that a window someone is looking at isn't visibly stale. */
+const BRIDGE_STATS_INTERVAL_MS = 30000;
+let bridgeStatsSentAt = 0;
+
+async function bridgeSendStats(force) {
+  if (!bridgeSocket || bridgeSocket.readyState !== WebSocket.OPEN) return;
+  if (!force && Date.now() - bridgeStatsSentAt < BRIDGE_STATS_INTERVAL_MS) return;
+  bridgeStatsSentAt = Date.now();
+  try {
+    const { stats = {} } = await chrome.storage.local.get('stats');
+    bridgeSocket.send(JSON.stringify({ type: 'browserStats', stats }));
+  } catch { /* not worth retrying; the next tick will try again */ }
 }
 
 bridgeConnect();
@@ -1145,6 +1165,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
          heartbeat the pill needs to keep the domain from going stale. */
       if (domain && state.activeDomain === domain && state.activeStart) {
         bridgeSendDomain(domain, ms);
+        bridgeSendStats(false); // throttled internally
       }
       sendResponse({ ms });
     })();

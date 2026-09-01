@@ -108,4 +108,36 @@ contextBridge.exposeInMainWorld('tracker', {
   resetToday() { ipcRenderer.send('pill:reset-today'); },
 
   quit() { ipcRenderer.send('pill:quit'); },
+
+  /** Open the full stats window (from the pill's settings panel). */
+  openStats() { ipcRenderer.send('stats:open'); },
+
+  // ---- prayer alerts ----
+
+  /**
+   * A prayer moment to display. Two kinds arrive separately, minutes apart:
+   * `prayer-name` at the time itself, then `prayer-verse` as a follow-up.
+   */
+  onPrayer(callback) { return subscribe('pill:prayer', callback); },
+
+  /** Grow the window by `height` px for the alert card. */
+  alertOpen(height) { ipcRenderer.send('pill:alert-open', height); },
+
+  /** Shrink back to the bare pill once the alert has run its course. */
+  alertClose() { ipcRenderer.send('pill:alert-close'); },
+});
+
+/*
+ * The stats window's own surface. Separate object because it is a different
+ * document with a different job — the pill has no business calling these, and
+ * the stats window has no business dragging or resizing the pill.
+ */
+contextBridge.exposeInMainWorld('stats', {
+  /** Full payload: day list, per-app totals, per-site totals. */
+  load() { return ipcRenderer.invoke('stats:load'); },
+
+  /** Fired when the extension pushes fresh browser data. */
+  onChanged(callback) { return subscribe('stats:changed', callback); },
+
+  openFolder() { ipcRenderer.send('stats:open-folder'); },
 });

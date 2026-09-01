@@ -16,13 +16,15 @@
 
 const {
   app, BrowserWindow, Menu, Tray, ipcMain,
-  screen, shell, dialog, powerMonitor, nativeImage,
+  screen, shell, dialog, powerMonitor, nativeImage, nativeTheme,
 } = require('electron');
 
 const path = require('path');
 const fs = require('fs');
 const readline = require('readline');
 const { spawn } = require('child_process');
+
+const prayer = require('./prayer');
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -274,6 +276,83 @@ function schedulePersist() {
   persistTimer = setTimeout(() => { persistTimer = null; persistNow(); }, PERSIST_DEBOUNCE_MS);
 }
 
+// ---------------------------------------------------------------------------
+// Browser statistics (browser-stats.json)
+//
+// Mirror of what the extension has tracked, pushed over the bridge. Held in
+// its own file rather than merged into stats.json so a malformed payload from
+// the browser can never corrupt our own tracking, and so "reset today" can
+// treat the two independently.
+// ---------------------------------------------------------------------------
+
+/** @type {Record<string, Record<string, {opens: number, activeMs: number}>>} */
+let browserStats = {};
+let browserStatsPath = null;
+let browserDirty = false;
+let browserPersistTimer = null;
+
+/*
+ * Everything here arrives from another process, so nothing is trusted: keys
+ * must look like dates and domains, numbers must be finite and non-negative,
+ * and the shape is rebuilt rather than passed through.
+ */
+function sanitizeBrowserStats(raw) {
+  const out = {};
+  for (const [day, domains] of Object.entries(raw)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    if (!domains || typeof domains !== 'object' || Array.isArray(domains)) continue;
+    const clean = {};
+    for (const [domain, v] of Object.entries(domains)) {
+      if (typeof domain !== 'string' || !domain || domain.length > 253) continue;
+      if (!v || typeof v !== 'object') continue;
+      const activeMs = Number(v.activeMs);
+      const opens = Number(v.opens);
+      if (!Number.isFinite(activeMs) || activeMs < 0) continue;
+      clean[domain] = {
+        opens: Number.isFinite(opens) && opens >= 0 ? Math.round(opens) : 0,
+        activeMs: Math.round(activeMs),
+      };
+    }
+    if (Object.keys(clean).length) out[day] = clean;
+  }
+  return out;
+}
+
+function loadBrowserStats() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(browserStatsPath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      browserStats = sanitizeBrowserStats(parsed);
+      return;
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn('[browser-stats] could not read:', err.message);
+    }
+  }
+  browserStats = {};
+}
+
+function persistBrowserNow() {
+  if (browserPersistTimer) { clearTimeout(browserPersistTimer); browserPersistTimer = null; }
+  if (!browserDirty || !browserStatsPath) return;
+  try {
+    writeJsonAtomic(browserStatsPath, browserStats);
+    browserDirty = false;
+  } catch (err) {
+    console.error('[browser-stats] write failed:', err.message);
+  }
+}
+
+function scheduleBrowserPersist() {
+  browserDirty = true;
+  if (browserPersistTimer) return;
+  browserPersistTimer = setTimeout(() => {
+    browserPersistTimer = null;
+    persistBrowserNow();
+  }, PERSIST_DEBOUNCE_MS);
+}
+
 function bucketFor(dayKey, appName) {
   const day = stats[dayKey] || (stats[dayKey] = {});
   return day[appName] || (day[appName] = { opens: 0, activeMs: 0 });
@@ -355,6 +434,7 @@ const state = {
 };
 
 let mainWindow = null;
+let statsWindow = null;
 let tray = null;
 let watcher = null;
 let watcherRestarts = 0;
@@ -370,6 +450,9 @@ let panelExtra = 0;
 let panelDirection = 'down';
 /** True while a native menu or modal owns focus, so blur must not close the panel. */
 let menuOpen = false;
+/* A prayer alert is showing. Shares the panel's geometry but not its
+   dismissal rules — it expires on a timer instead of on blur or Escape. */
+let alertActive = false;
 /** Window position captured at the start of a renderer-driven drag. */
 let dragOrigin = null;
 /** When our own window first became the foreground window; 0 when it is not. */
@@ -709,14 +792,32 @@ function startBridge() {
     socket.on('message', (data) => {
       let msg;
       try { msg = JSON.parse(data.toString()); } catch { return; }
-      if (!msg || msg.type !== 'domain') return;
-      if (typeof msg.domain !== 'string' || !msg.domain) return;
+      if (!msg) return;
 
-      // Timestamp on arrival rather than trusting a clock we do not control;
-      // liveDomain() uses this to decide whether the report is still fresh.
-      state.bridgeDomain = msg.domain;
-      state.bridgeDomainAt = Date.now();
-      pushState();
+      if (msg.type === 'domain') {
+        if (typeof msg.domain !== 'string' || !msg.domain) return;
+        // Timestamp on arrival rather than trusting a clock we do not control;
+        // liveDomain() uses this to decide whether the report is still fresh.
+        state.bridgeDomain = msg.domain;
+        state.bridgeDomainAt = Date.now();
+        pushState();
+        return;
+      }
+
+      /*
+       * Full per-day browser history, so the stats window can show sites
+       * beside applications. The extension owns this data — we only cache the
+       * last snapshot it sent. Kept in its own file so a bad payload can never
+       * corrupt the desktop's own tracking.
+       */
+      if (msg.type === 'browserStats') {
+        if (!msg.stats || typeof msg.stats !== 'object' || Array.isArray(msg.stats)) return;
+        browserStats = sanitizeBrowserStats(msg.stats);
+        scheduleBrowserPersist();
+        if (statsWindow && !statsWindow.isDestroyed()) {
+          statsWindow.webContents.send('stats:changed');
+        }
+      }
     });
 
     socket.on('error', () => { /* connection-level noise is not actionable */ });
@@ -872,6 +973,10 @@ function createWindow() {
       sandbox: true,
       spellcheck: false,
       devTools: !app.isPackaged,
+      /* A prayer alert fires from a timer, so there is no user gesture to
+         satisfy the default autoplay policy — the Adhan would be blocked
+         silently every time. This window plays only URLs we schedule. */
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 
@@ -900,7 +1005,9 @@ function createWindow() {
    * Native menus and the reset dialog also blur us, hence the menuOpen guard.
    */
   mainWindow.on('blur', () => {
-    if (menuOpen || !panelOpen) return;
+    // alertActive: a prayer alert times out on its own and must survive the
+    // user simply carrying on working in another window.
+    if (menuOpen || alertActive || !panelOpen) return;
     mainWindow.webContents.send('pill:panel-dismiss');
   });
 
@@ -1015,13 +1122,73 @@ function openStatsFolder() {
   else shell.openPath(path.dirname(statsPath));
 }
 
+// ---------------------------------------------------------------------------
+// Stats window
+//
+// A normal, framed, resizable window — deliberately unlike the pill. The pill
+// is a HUD you glance at; this is a document you sit and read.
+// ---------------------------------------------------------------------------
+
+function openStatsWindow() {
+  if (statsWindow && !statsWindow.isDestroyed()) {
+    if (statsWindow.isMinimized()) statsWindow.restore();
+    statsWindow.focus();
+    return;
+  }
+
+  statsWindow = new BrowserWindow({
+    width: 940,
+    height: 680,
+    minWidth: 560,
+    minHeight: 420,
+    title: 'Tab Tracker',
+    // Painted before the renderer's first frame, so opening never flashes white
+    // on a dark desktop. The page picks the matching theme itself.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#141614' : '#ffffff',
+    show: false,
+    icon: path.join(__dirname, '..', 'icons', '128.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  statsWindow.removeMenu();
+  statsWindow.loadFile(path.join(__dirname, 'renderer', 'stats.html'));
+  statsWindow.once('ready-to-show', () => statsWindow.show());
+  statsWindow.on('closed', () => { statsWindow = null; });
+}
+
+/** Everything the stats window renders, assembled in one payload. */
+function statsPayload() {
+  // Flush first: up to PERSIST_DEBOUNCE_MS of the current app's time is still
+  // only in memory, and the window should show it rather than lag behind.
+  tick();
+  const days = Array.from(new Set([
+    ...Object.keys(stats),
+    ...Object.keys(browserStats),
+    todayKey(),
+  ])).sort().reverse();
+  return {
+    today: todayKey(),
+    days,
+    apps: stats,
+    sites: browserStats,
+    paused: state.paused,
+  };
+}
+
 function buildContextMenu() {
   return Menu.buildFromTemplate([
+    { label: 'Open Tab Tracker', click: openStatsWindow },
+    { type: 'separator' },
     {
       label: state.paused ? 'Resume tracking' : 'Pause tracking',
       click: () => setPaused(!state.paused),
     },
     { type: 'separator' },
+    { label: 'Preview prayer alert', click: () => prayer.runDemo() },
     { label: "Reset today's stats…", click: resetTodayWithDialog },
     { label: 'Open stats folder', click: openStatsFolder },
     { type: 'separator' },
@@ -1038,7 +1205,9 @@ function rebuildTrayMenu() {
   if (!tray) return;
   const visible = !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
   tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open Tab Tracker', click: openStatsWindow },
     { label: visible ? 'Hide pill' : 'Show pill', click: togglePill },
+    { type: 'separator' },
     {
       label: state.paused ? 'Resume tracking' : 'Pause tracking',
       click: () => setPaused(!state.paused),
@@ -1081,8 +1250,10 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     statsPath = path.join(app.getPath('userData'), 'stats.json');
     uiStatePath = path.join(app.getPath('userData'), 'ui-state.json');
+    browserStatsPath = path.join(app.getPath('userData'), 'browser-stats.json');
 
     loadStats();
+    loadBrowserStats();
     loadUiState();
     state.paused = uiState.paused;
 
@@ -1090,6 +1261,22 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     startWatcher();
     startBridge();
+
+    prayer.init({
+      userDataPath: app.getPath('userData'),
+      onAlert: (payload) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        // A hidden pill would fire audio at nobody; bring it back for this.
+        if (!mainWindow.isVisible()) mainWindow.showInactive();
+        mainWindow.webContents.send('pill:prayer', payload);
+      },
+    });
+
+    // Lets a shortcut (or a smoke test) land straight on the stats window.
+    if (process.argv.includes('--open-stats')) openStatsWindow();
+    if (process.argv.includes('--demo-prayer')) {
+      setTimeout(() => prayer.runDemo(), 1500);
+    }
 
     state.lastAccrualAt = Date.now();
     tickTimer = setInterval(tick, TICK_MS);
@@ -1103,6 +1290,12 @@ if (!app.requestSingleInstanceLock()) {
   // -- pill lifecycle -------------------------------------------------------
 
   ipcMain.on('pill:ready', () => { pushState(); pushSettings(); });
+
+  // -- stats window ---------------------------------------------------------
+
+  ipcMain.handle('stats:load', () => statsPayload());
+  ipcMain.on('stats:open', openStatsWindow);
+  ipcMain.on('stats:open-folder', openStatsFolder);
 
   ipcMain.on('pill:context-menu', (event) => {
     notePillInteraction();
@@ -1183,6 +1376,34 @@ if (!app.requestSingleInstanceLock()) {
     saveUiState();
   });
 
+  /*
+   * Prayer alert sizing. Reuses the panel's geometry machinery — same "grow the
+   * window around a fixed pill" problem — but keeps its own flag so the alert
+   * is never dismissed by the blur and Escape handling that closes the settings
+   * panel. An alert times out on its own; it is not a menu.
+   */
+  ipcMain.on('pill:alert-open', (event, rawHeight) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const extra = Math.round(Number(rawHeight));
+    if (!Number.isFinite(extra) || extra <= 0) return;
+    const origin = pillOrigin();
+    alertActive = true;
+    panelOpen = true;
+    panelExtra = Math.min(extra, MAX_PANEL_HEIGHT);
+    applyGeometry(origin.x, origin.y);
+    mainWindow.webContents.send('pill:panel-layout', { direction: panelDirection });
+  });
+
+  ipcMain.on('pill:alert-close', () => {
+    if (!mainWindow || mainWindow.isDestroyed() || !alertActive) return;
+    const origin = pillOrigin();
+    alertActive = false;
+    panelOpen = false;
+    panelExtra = 0;
+    panelDirection = 'down';
+    applyGeometry(origin.x, origin.y);
+  });
+
   // -- settings actions -----------------------------------------------------
 
   /*
@@ -1221,6 +1442,7 @@ if (!app.requestSingleInstanceLock()) {
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
     tick();        // settle the final partial second
     persistNow();  // always flush on quit, debounce notwithstanding
+    persistBrowserNow();
     saveUiState({ immediate: true });
     stopWatcher();
     if (bridgeServer) { try { bridgeServer.close(); } catch { /* ignore */ } }

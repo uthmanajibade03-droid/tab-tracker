@@ -30,6 +30,7 @@ const els = {
   resetConfirm: document.getElementById('reset-confirm'),
   resetCancel: document.getElementById('reset-cancel'),
   resetGo: document.getElementById('reset-go'),
+  openStats: document.getElementById('open-stats'),
   quit: document.getElementById('quit'),
 };
 
@@ -445,7 +446,104 @@ els.resetGo.addEventListener('click', () => {
   closePanel();
 });
 
+els.openStats.addEventListener('click', () => {
+  window.tracker.openStats();
+  closePanel();
+});
+
 els.quit.addEventListener('click', () => window.tracker.quit());
+
+// ---------------------------------------------------------------------------
+// Prayer alerts
+//
+// Two independent moments, minutes apart: the prayer name at the time itself,
+// then a verse as a follow-up. Each grows the window, shows for its own
+// duration, and shrinks back. A second alert arriving mid-show replaces the
+// first rather than queueing — the newer moment is the relevant one.
+// ---------------------------------------------------------------------------
+
+const alertEls = {
+  root: document.getElementById('alert'),
+  name: document.getElementById('alert-name'),
+  arabic: document.getElementById('alert-arabic'),
+  english: document.getElementById('alert-english'),
+  ref: document.getElementById('alert-ref'),
+  dismiss: document.getElementById('alert-dismiss'),
+  audio: document.getElementById('alert-audio'),
+};
+
+let alertTimer = null;
+
+function stopAlertAudio() {
+  try {
+    alertEls.audio.pause();
+    alertEls.audio.removeAttribute('src');
+    alertEls.audio.load();
+  } catch { /* nothing playing */ }
+}
+
+function closeAlert() {
+  if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
+  stopAlertAudio();
+  document.body.classList.remove('alert-open');
+  // Let the fade finish before collapsing the window, or the card vanishes
+  // instantly and the whole thing reads as a glitch rather than a dismissal.
+  setTimeout(() => {
+    if (document.body.classList.contains('alert-open')) return; // re-opened
+    alertEls.root.hidden = true;
+    window.tracker.alertClose();
+  }, 200);
+}
+
+function showAlert(payload) {
+  if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
+  stopAlertAudio();
+
+  const isVerse = payload.kind === 'prayer-verse';
+  const verse = payload.verse || null;
+
+  alertEls.name.textContent = isVerse
+    ? (verse && verse.surahName ? verse.surahName : 'Reflection')
+    : `${payload.prayer}`;
+
+  if (isVerse && verse) {
+    alertEls.arabic.textContent = verse.arabic || '';
+    alertEls.arabic.hidden = !verse.arabic;
+    alertEls.english.textContent = verse.english || '';
+    alertEls.english.hidden = !verse.english;
+    alertEls.ref.textContent = verse.reference ? `Quran ${verse.reference}` : '';
+    alertEls.ref.hidden = !verse.reference;
+  } else {
+    alertEls.arabic.hidden = true;
+    alertEls.english.textContent = 'It is time for prayer.';
+    alertEls.english.hidden = false;
+    alertEls.ref.hidden = true;
+  }
+
+  // Unhide before measuring — offsetHeight is 0 on a hidden element, and the
+  // main process needs the real height to size the window.
+  alertEls.root.hidden = false;
+  const height = Math.ceil(alertEls.root.offsetHeight + cssVarPx('--inset-y'));
+  window.tracker.alertOpen(height);
+
+  requestAnimationFrame(() => document.body.classList.add('alert-open'));
+
+  if (payload.audioUrl) {
+    try {
+      alertEls.audio.src = payload.audioUrl;
+      // Electron's autoplay policy is relaxed for this window; a rejection
+      // here is a missing file or no network, and must not break the visual.
+      alertEls.audio.play().catch(() => {});
+    } catch { /* leave it silent */ }
+  }
+
+  const seconds = Number(payload.seconds);
+  const ms = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 10000;
+  alertTimer = setTimeout(closeAlert, ms);
+}
+
+alertEls.dismiss.addEventListener('click', closeAlert);
+window.tracker.onPrayer(showAlert);
 
 // ---------------------------------------------------------------------------
 // Global gestures

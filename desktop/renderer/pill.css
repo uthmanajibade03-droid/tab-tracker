@@ -250,6 +250,127 @@ body.resizing .grip { opacity: 1; }
    so every flex container in here has to restore it explicitly — otherwise the
    panel would stay laid out (and measurable, and reachable by assistive tech)
    while it is supposed to be gone. */
+/* ---------------------------------------------------------------------------
+   Prayer alert
+
+   Same dark-glass material as the settings panel — it belongs to the same
+   object — but wider-feeling and quieter: no rows, no buttons competing for
+   attention, and the Arabic given room to breathe. It occupies the same slot
+   below (or above) the pill and follows the same order swap.
+   --------------------------------------------------------------------------- */
+
+.alert[hidden] { display: none; }
+
+.alert {
+  order: 2;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  margin: 0 var(--inset-x) var(--inset-y);
+  padding: 14px 16px 12px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+
+  border-radius: calc(14px * var(--scale));
+  background: rgba(18, 26, 22, 0.95);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.46),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 1px rgba(77, 219, 155, 0.22);
+  backdrop-filter: blur(18px) saturate(140%);
+  color: rgba(255, 255, 255, 0.9);
+
+  -webkit-app-region: no-drag;
+
+  opacity: 0;
+  transform: scale(0.97) translateY(-4px);
+  transform-origin: top center;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+body.panel-up .alert {
+  order: 1;
+  margin: var(--inset-y) var(--inset-x) 0;
+  transform: scale(0.97) translateY(4px);
+  transform-origin: bottom center;
+}
+
+body.alert-open .alert {
+  opacity: 1;
+  transform: none;
+}
+
+.alert-name {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #7fe8b8;
+}
+
+/* Mushaf-style faces when present, then anything with real Arabic coverage. */
+.alert-arabic {
+  margin: 2px 0 0;
+  font-family: "Traditional Arabic", "Amiri Quran", "Scheherazade New",
+    "Segoe UI Historic", "Segoe UI", serif;
+  font-size: 21px;
+  line-height: 1.9;
+  direction: rtl;
+  color: #fff;
+  max-width: 46ch;
+}
+
+.alert-english {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 52ch;
+}
+
+.alert-ref {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(127, 232, 184, 0.75);
+}
+
+.alert-dismiss {
+  margin-top: 2px;
+  font: inherit;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 4px 14px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.alert-dismiss:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.alert-dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The pill itself takes on the alert's tint while one is showing. */
+body.alert-open .pill {
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(77, 219, 155, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert { transition: none; }
+}
+
 .panel[hidden] { display: none; }
 
 .panel {

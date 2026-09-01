@@ -10,7 +10,7 @@
     alone does not reliably match sibling files.
   -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:;" />
+        content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; media-src https:;" />
   <title>Tab Tracker</title>
   <link rel="stylesheet" href="pill.css" />
 </head>
@@ -48,6 +48,12 @@
 
     <div class="panel" id="panel" role="dialog" aria-label="Tab Tracker settings" hidden>
 
+      <button class="row" type="button" id="open-stats">
+        <span class="row-label">Open Tab Tracker</span>
+      </button>
+
+      <div class="rule"></div>
+
       <button class="row" type="button" id="pause">
         <span class="row-label" id="pause-label">Pause tracking</span>
       </button>
@@ -72,7 +78,19 @@
       </button>
 
     </div>
+
+    <!-- Prayer alert. Shares the panel's slot below the pill, but is driven by
+         a timer rather than by the user, so it lives outside #panel. -->
+    <div class="alert" id="alert" role="status" aria-live="polite" hidden>
+      <div class="alert-name" id="alert-name"></div>
+      <p class="alert-arabic" id="alert-arabic" hidden></p>
+      <p class="alert-english" id="alert-english" hidden></p>
+      <div class="alert-ref" id="alert-ref" hidden></div>
+      <button class="alert-dismiss" type="button" id="alert-dismiss">Dismiss</button>
+    </div>
   </div>
+
+  <audio id="alert-audio" preload="none"></audio>
 
   <script src="pill.js"></script>
 </body>
