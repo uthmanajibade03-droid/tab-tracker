@@ -173,6 +173,23 @@ contextBridge.exposeInMainWorld('stats', {
   saveVoiceConfig(cfg) { return ipcRenderer.invoke('voice:set-config', cfg); },
   dial(peerId) { return ipcRenderer.invoke('voice:dial', peerId); },
   hangUp(peerId) { return ipcRenderer.invoke('voice:hangup', peerId); },
+
+  // ---- prayer ----
+
+  /** Current values plus the lists to choose from (reciters, adhans, surahs). */
+  prayerSettings() { return ipcRenderer.invoke('prayer:settings'); },
+
+  /** Partial update; returns the settings as they ended up. */
+  savePrayer(settings) { return ipcRenderer.invoke('prayer:save', settings); },
+
+  /** Load the chosen verse's text so it can be seen before it ever fires. */
+  previewVerse() { return ipcRenderer.invoke('prayer:preview-verse'); },
+
+  /** Today's five times, for display. */
+  prayerTimes() { return ipcRenderer.invoke('prayer:times'); },
+
+  /** Run the full name → verse sequence on the pill, now. */
+  previewPrayer() { ipcRenderer.send('prayer:demo'); },
 });
 
 /*

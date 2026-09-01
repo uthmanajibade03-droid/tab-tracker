@@ -22,13 +22,40 @@ const path = require('path');
 
 const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
-const VERSE_REFERENCES = [
-  '2:153', '2:186', '2:286', '3:200', '4:103',
-  '13:28', '17:78', '20:14', '23:2', '24:37',
-  '29:45', '33:41', '62:9', '65:3', '87:15', '94:6',
+const { SURAHS } = require('./surahs');
+
+/* Every reciter here was checked against everyayah.com rather than copied from
+   a list — a name that 404s would fail silently at prayer time, which is the
+   worst possible moment to discover it. */
+const RECITERS = [
+  { id: 'Husary_128kbps', name: 'Mahmoud Khalil Al-Husary' },
+  { id: 'Husary_Muallim_128kbps', name: 'Al-Husary (Muallim)' },
+  { id: 'Alafasy_128kbps', name: 'Mishary Rashid Alafasy' },
+  { id: 'Abdul_Basit_Murattal_192kbps', name: 'Abdul Basit (Murattal)' },
+  { id: 'Minshawy_Murattal_128kbps', name: 'Al-Minshawi (Murattal)' },
+  { id: 'Abdurrahmaan_As-Sudais_192kbps', name: 'Abdurrahman As-Sudais' },
+  { id: 'Saood_ash-Shuraym_128kbps', name: 'Saud Ash-Shuraim' },
+  { id: 'Hudhaify_128kbps', name: 'Ali Al-Hudhaify' },
+  { id: 'Muhammad_Ayyoub_128kbps', name: 'Muhammad Ayyoub' },
+  { id: 'Ghamadi_40kbps', name: 'Saad Al-Ghamdi' },
 ];
 
-const DEFAULT_ADHAN_URL = 'https://www.islamcan.com/audio/adhan/azan2.mp3';
+/* Likewise verified. The custom field means this list is a convenience, not a
+   ceiling — any reachable mp3 URL works. */
+const ADHANS = [
+  { url: 'https://www.islamcan.com/audio/adhan/azan1.mp3', name: 'Adhan 1' },
+  // The one the app has always used. Flagged so it stays findable in the list
+  // however far someone wanders through the alternatives.
+  { url: 'https://www.islamcan.com/audio/adhan/azan2.mp3', name: 'Adhan 2', isDefault: true },
+  { url: 'https://www.islamcan.com/audio/adhan/azan3.mp3', name: 'Adhan 3' },
+  { url: 'https://www.islamcan.com/audio/adhan/azan4.mp3', name: 'Adhan 4' },
+  { url: 'https://www.islamcan.com/audio/adhan/azan5.mp3', name: 'Adhan 5' },
+  { url: 'https://www.islamcan.com/audio/adhan/azan6.mp3', name: 'Adhan 6' },
+  { url: 'https://www.islamcan.com/audio/adhan/azan7.mp3', name: 'Adhan 7' },
+  { url: 'https://www.islamcan.com/audio/adhan/azan8.mp3', name: 'Adhan 8' },
+];
+
+const DEFAULT_ADHAN_URL = ADHANS[1].url;
 
 const DEFAULTS = {
   enabled: true,
@@ -36,8 +63,21 @@ const DEFAULTS = {
   verseDelayMinutes: 5,
   verseSeconds: 14,
   adhanUrl: DEFAULT_ADHAN_URL,
+  reciter: 'Husary_128kbps',
+  /* The verse recited after the call to prayer. Chosen, not rotated —
+     24:37 is only a starting point. */
+  surah: 24,
+  ayah: 37,
   method: 2, // ISNA
 };
+
+/** Clamp a surah/ayah pair to something that actually exists. */
+function normaliseRef(surah, ayah) {
+  const s = Math.min(114, Math.max(1, Math.round(Number(surah) || 1)));
+  const maxAyah = SURAHS[s - 1][3];
+  const a = Math.min(maxAyah, Math.max(1, Math.round(Number(ayah) || 1)));
+  return { surah: s, ayah: a };
+}
 
 /*
  * setTimeout stores its delay in a 32-bit int, so anything beyond ~24.8 days
@@ -73,6 +113,10 @@ const GEO_PROVIDERS = [
 
 let store = { config: null, verses: {}, alert: { ...DEFAULTS } };
 let storePath = null;
+/* Today's five times, kept from the last successful fetch so the settings
+   window can show them without asking Aladhan again on every open. */
+let lastTimings = null;
+let lastTimingsDate = null;
 let onAlert = () => {};
 let timers = [];
 let refreshTimer = null;
@@ -140,8 +184,10 @@ async function ensureConfig() {
   return store.config;
 }
 
-function verseRefForToday() {
-  return VERSE_REFERENCES[Math.floor(Date.now() / 86400000) % VERSE_REFERENCES.length];
+/** The verse the user has chosen to hear after the call to prayer. */
+function chosenRef() {
+  const { surah, ayah } = normaliseRef(store.alert.surah, store.alert.ayah);
+  return `${surah}:${ayah}`;
 }
 
 async function fetchVerse(ref) {
@@ -164,13 +210,16 @@ async function fetchVerse(ref) {
   return verse;
 }
 
-/** Husary recitation for "S:A" — same source the extension uses. */
+/** Recitation URL for "S:A" in the configured reciter's voice. */
 function recitationUrl(ref) {
   const m = String(ref).match(/(\d{1,3})\s*:\s*(\d{1,3})/);
   if (!m) return '';
   const surah = String(parseInt(m[1], 10)).padStart(3, '0');
   const ayah = String(parseInt(m[2], 10)).padStart(3, '0');
-  return `https://everyayah.com/data/Husary_128kbps/${surah}${ayah}.mp3`;
+  const reciter = RECITERS.some(r => r.id === store.alert.reciter)
+    ? store.alert.reciter
+    : DEFAULTS.reciter;
+  return `https://everyayah.com/data/${reciter}/${surah}${ayah}.mp3`;
 }
 
 function clearTimers() {
@@ -193,7 +242,7 @@ function fireName(name) {
 async function fireVerse(name) {
   let verse = null;
   try {
-    verse = await fetchVerse(verseRefForToday());
+    verse = await fetchVerse(chosenRef());
   } catch (err) {
     log('verse fetch failed:', err.message);
     const cached = Object.values(store.verses)[0];
@@ -239,12 +288,14 @@ async function schedule() {
 
   const now = Date.now();
   const scheduled = [];
+  const parsed = {};
   for (const name of PRAYER_NAMES) {
     const raw = timings[name];
     if (typeof raw !== 'string') continue;
     // Aladhan can append a zone suffix, e.g. "05:05 (EDT)".
     const m = raw.match(/^(\d{1,2}):(\d{2})/);
     if (!m) continue;
+    parsed[name] = `${m[1].padStart(2, '0')}:${m[2]}`;
     const when = new Date();
     when.setHours(Number(m[1]), Number(m[2]), 0, 0);
     const delay = when.getTime() - now;
@@ -260,6 +311,10 @@ async function schedule() {
     }, delay));
     scheduled.push(`${name} ${m[1]}:${m[2]}`);
   }
+  /* Keep all five regardless of how many are still upcoming — the settings
+     window shows the whole day, not just what is left of it. */
+  lastTimings = parsed;
+  lastTimingsDate = dateStr;
   log(scheduled.length ? `scheduled — ${scheduled.join(', ')}` : 'nothing left today');
 }
 
@@ -276,7 +331,7 @@ async function runDemo() {
   // Long enough to read the name card, short enough to not be a wait.
   timers.push(setTimeout(async () => {
     let verse = null;
-    try { verse = await fetchVerse(verseRefForToday()); } catch { /* handled below */ }
+    try { verse = await fetchVerse(chosenRef()); } catch { /* handled below */ }
     if (!verse) verse = Object.values(store.verses)[0] || null;
     if (!verse) { log('demo: no verse available'); return; }
     onAlert({
@@ -314,4 +369,99 @@ function status() {
   };
 }
 
-module.exports = { init, stop, runDemo, schedule, status, PRAYER_NAMES };
+/** Everything the settings UI needs: current values plus the available choices. */
+function getSettings() {
+  const { surah, ayah } = normaliseRef(store.alert.surah, store.alert.ayah);
+  return {
+    enabled: store.alert.enabled !== false,
+    nameSeconds: store.alert.nameSeconds,
+    verseDelayMinutes: store.alert.verseDelayMinutes,
+    verseSeconds: store.alert.verseSeconds,
+    adhanUrl: store.alert.adhanUrl || DEFAULT_ADHAN_URL,
+    reciter: store.alert.reciter || DEFAULTS.reciter,
+    surah,
+    ayah,
+    city: store.config ? store.config.city : null,
+    reciters: RECITERS,
+    adhans: ADHANS,
+    surahs: SURAHS,
+  };
+}
+
+/**
+ * Apply settings. Every field is optional and independently validated, so a
+ * form that only changed one control cannot reset the others, and a nonsense
+ * value falls back to the current one rather than corrupting the schedule.
+ */
+function setSettings(next) {
+  if (!next || typeof next !== 'object') return getSettings();
+  const a = store.alert;
+
+  if (typeof next.enabled === 'boolean') a.enabled = next.enabled;
+
+  const num = (v, lo, hi, cur) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= lo && n <= hi ? n : cur;
+  };
+  if (next.nameSeconds !== undefined) a.nameSeconds = num(next.nameSeconds, 2, 120, a.nameSeconds);
+  if (next.verseSeconds !== undefined) a.verseSeconds = num(next.verseSeconds, 2, 300, a.verseSeconds);
+  if (next.verseDelayMinutes !== undefined) {
+    // 0 is meaningful: the verse follows immediately after the Adhan.
+    a.verseDelayMinutes = num(next.verseDelayMinutes, 0, 120, a.verseDelayMinutes);
+  }
+
+  if (typeof next.reciter === 'string' && RECITERS.some(r => r.id === next.reciter)) {
+    a.reciter = next.reciter;
+  }
+
+  /* Any https mp3 is allowed, not just the listed ones — but it must at least
+     be a URL, or the alert would fail silently at prayer time. */
+  if (typeof next.adhanUrl === 'string' && next.adhanUrl.trim()) {
+    const url = next.adhanUrl.trim();
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') a.adhanUrl = url;
+    } catch { /* keep the existing one */ }
+  }
+
+  if (next.surah !== undefined || next.ayah !== undefined) {
+    const ref = normaliseRef(
+      next.surah !== undefined ? next.surah : a.surah,
+      next.ayah !== undefined ? next.ayah : a.ayah,
+    );
+    a.surah = ref.surah;
+    a.ayah = ref.ayah;
+  }
+
+  save();
+  // Durations and the verse take effect on the next alert, but enabling or
+  // disabling changes whether alarms should exist at all.
+  schedule().catch(err => log('reschedule after settings failed:', err.message));
+  return getSettings();
+}
+
+/** Fetch the chosen verse now, so the settings UI can show what was picked. */
+async function previewVerse() {
+  const ref = chosenRef();
+  try {
+    const verse = await fetchVerse(ref);
+    return { ok: true, verse, audioUrl: recitationUrl(ref) };
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || 'could not load that verse' };
+  }
+}
+
+/** Today's times. Re-fetches if the schedule has not run for today yet. */
+async function getTimings() {
+  const d = new Date();
+  const today = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+  if (!lastTimings || lastTimingsDate !== today) {
+    await schedule().catch(() => {});
+  }
+  return { timings: lastTimings || {}, city: store.config ? store.config.city : null };
+}
+
+module.exports = {
+  init, stop, runDemo, schedule, status, PRAYER_NAMES,
+  getSettings, setSettings, previewVerse, getTimings,
+};

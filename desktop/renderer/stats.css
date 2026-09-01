@@ -370,6 +370,130 @@ main {
 
 #v-saved { font-size: 12px; color: var(--ink-3); }
 
+/* ---------- prayer ---------- */
+
+/* Five times across a row: the whole point is comparing them at a glance,
+   so they get equal columns and lining figures rather than a list. */
+.times {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.time-cell {
+  min-width: 0;
+  text-align: center;
+  padding: 10px 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.time-cell.next {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.time-cell .n {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.time-cell .t {
+  margin-top: 3px;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-cell.next .t { color: var(--accent); }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+
+.ref-row,
+.timing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.ref-row select { max-width: 260px; }
+.ref-row input,
+.timing-row input {
+  width: 68px;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ref-sep, .ref-max { color: var(--ink-3); font-size: 12px; }
+
+.verse-preview {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 0 8px 8px 0;
+}
+
+.verse-preview .ar {
+  display: block;
+  font-family: "Traditional Arabic", "Amiri Quran", "Segoe UI Historic", serif;
+  font-size: 19px;
+  line-height: 1.9;
+  direction: rtl;
+  color: var(--ink);
+}
+
+.verse-preview .en {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.verse-preview .rf {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.field-actions button.secondary {
+  background: transparent;
+  color: var(--ink-2);
+  border-color: var(--line);
+}
+
+.field-actions button.secondary:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+  filter: none;
+}
+
+@media (max-width: 640px) {
+  .times { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ---------- footer ---------- */
 
 .foot {

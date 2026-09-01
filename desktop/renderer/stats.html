@@ -44,6 +44,67 @@
     <p class="empty" id="apps-empty" hidden>Nothing tracked on this day.</p>
   </section>
 
+  <section class="panel" aria-labelledby="h-prayer">
+    <div class="panel-head">
+      <h2 id="h-prayer">Prayer</h2>
+      <span class="panel-note" id="prayer-note"></span>
+    </div>
+
+    <div id="prayer-times" class="times"></div>
+
+    <details class="voice-setup" id="prayer-setup">
+      <summary>Prayer settings</summary>
+
+      <label class="check">
+        <input type="checkbox" id="p-enabled">
+        <span>Announce prayer times</span>
+      </label>
+
+      <div class="field">
+        <label for="p-adhan">Call to prayer</label>
+        <select id="p-adhan"></select>
+      </div>
+      <div class="field">
+        <label for="p-adhan-custom">…or your own recording</label>
+        <input id="p-adhan-custom" type="url" autocomplete="off" spellcheck="false" placeholder="https://example.com/adhan.mp3">
+      </div>
+
+      <div class="field">
+        <label for="p-reciter">Reciter</label>
+        <select id="p-reciter"></select>
+      </div>
+
+      <div class="field">
+        <label>Verse recited after the call</label>
+        <div class="ref-row">
+          <select id="p-surah"></select>
+          <span class="ref-sep">verse</span>
+          <input id="p-ayah" type="number" min="1" step="1">
+          <span class="ref-max" id="p-ayah-max"></span>
+        </div>
+      </div>
+      <blockquote class="verse-preview" id="p-verse" hidden></blockquote>
+
+      <div class="field">
+        <label>Timing</label>
+        <div class="timing-row">
+          <span>Show the name for</span>
+          <input id="p-name-secs" type="number" min="2" max="120" step="1"><span>s,</span>
+          <span>then the verse</span>
+          <input id="p-delay" type="number" min="0" max="120" step="1"><span>min later</span>
+          <span>for</span>
+          <input id="p-verse-secs" type="number" min="2" max="300" step="1"><span>s</span>
+        </div>
+      </div>
+
+      <div class="field-actions">
+        <button type="button" id="p-save">Save</button>
+        <button type="button" id="p-preview" class="secondary">Preview on the pill</button>
+        <span id="p-saved"></span>
+      </div>
+    </details>
+  </section>
+
   <section class="panel" aria-labelledby="h-voice">
     <div class="panel-head">
       <h2 id="h-voice">Voice</h2>

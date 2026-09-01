@@ -1409,6 +1409,14 @@ if (!app.requestSingleInstanceLock()) {
 
   // -- voice: UI → main -----------------------------------------------------
 
+  // -- prayer settings ------------------------------------------------------
+
+  ipcMain.handle('prayer:settings', () => prayer.getSettings());
+  ipcMain.handle('prayer:save', (_e, s) => prayer.setSettings(s));
+  ipcMain.handle('prayer:preview-verse', () => prayer.previewVerse());
+  ipcMain.handle('prayer:times', () => prayer.getTimings());
+  ipcMain.on('prayer:demo', () => prayer.runDemo());
+
   ipcMain.handle('voice:snapshot', () => voice.snapshot());
   ipcMain.handle('voice:set-config', (_e, cfg) => voice.setConfig(cfg));
   ipcMain.handle('voice:dial', (_e, peerId) => voiceCommand('dial', { peerId }));

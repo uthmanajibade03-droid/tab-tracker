@@ -318,6 +318,196 @@ vSave.addEventListener('click', async () => {
 window.stats.onVoice(renderVoice);
 window.stats.voiceSnapshot().then(renderVoice);
 
+// ---------------------------------------------------------------------------
+// Prayer
+// ---------------------------------------------------------------------------
+
+const P = {
+  note: document.getElementById('prayer-note'),
+  times: document.getElementById('prayer-times'),
+  enabled: document.getElementById('p-enabled'),
+  adhan: document.getElementById('p-adhan'),
+  adhanCustom: document.getElementById('p-adhan-custom'),
+  reciter: document.getElementById('p-reciter'),
+  surah: document.getElementById('p-surah'),
+  ayah: document.getElementById('p-ayah'),
+  ayahMax: document.getElementById('p-ayah-max'),
+  versePreview: document.getElementById('p-verse'),
+  nameSecs: document.getElementById('p-name-secs'),
+  delay: document.getElementById('p-delay'),
+  verseSecs: document.getElementById('p-verse-secs'),
+  save: document.getElementById('p-save'),
+  preview: document.getElementById('p-preview'),
+  saved: document.getElementById('p-saved'),
+};
+
+let prayerSettings = null;
+let optionsBuilt = false;
+
+function buildPrayerOptions(s) {
+  if (optionsBuilt) return;
+  optionsBuilt = true;
+
+  for (const a of s.adhans) {
+    const o = document.createElement('option');
+    o.value = a.url;
+    o.textContent = a.isDefault ? `${a.name} (default)` : a.name;
+    P.adhan.appendChild(o);
+  }
+  // A URL that isn't one of ours still needs somewhere to be selected from.
+  const custom = document.createElement('option');
+  custom.value = '__custom__';
+  custom.textContent = 'Custom URL…';
+  P.adhan.appendChild(custom);
+
+  for (const r of s.reciters) {
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.name;
+    P.reciter.appendChild(o);
+  }
+
+  for (const [num, name, meaning] of s.surahs) {
+    const o = document.createElement('option');
+    o.value = String(num);
+    o.textContent = `${num}. ${name} — ${meaning}`;
+    P.surah.appendChild(o);
+  }
+}
+
+/** Ayah count for the selected surah — the bound on what can be asked for. */
+function ayahCount() {
+  if (!prayerSettings) return 1;
+  const n = Number(P.surah.value);
+  const row = prayerSettings.surahs.find(s => s[0] === n);
+  return row ? row[3] : 1;
+}
+
+function syncAyahBound() {
+  const max = ayahCount();
+  P.ayah.max = String(max);
+  P.ayahMax.textContent = `of ${max}`;
+  if (Number(P.ayah.value) > max) P.ayah.value = String(max);
+}
+
+function renderPrayer(s) {
+  prayerSettings = s;
+  buildPrayerOptions(s);
+
+  P.enabled.checked = s.enabled;
+  P.reciter.value = s.reciter;
+
+  const known = s.adhans.some(a => a.url === s.adhanUrl);
+  P.adhan.value = known ? s.adhanUrl : '__custom__';
+  P.adhanCustom.value = known ? '' : s.adhanUrl;
+
+  P.surah.value = String(s.surah);
+  P.ayah.value = String(s.ayah);
+  syncAyahBound();
+
+  P.nameSecs.value = String(s.nameSeconds);
+  P.delay.value = String(s.verseDelayMinutes);
+  P.verseSecs.value = String(s.verseSeconds);
+
+  P.note.textContent = s.enabled
+    ? (s.city ? s.city : 'times from your location')
+    : 'off';
+}
+
+/** Today's five times, with the next one marked. */
+async function renderTimes() {
+  const t = await window.stats.prayerTimes();
+  P.times.replaceChildren();
+  if (!t || !t.timings || !Object.keys(t.timings).length) {
+    P.times.textContent = '';
+    return;
+  }
+  const now = new Date();
+  const entries = Object.entries(t.timings);
+  const upcoming = entries.find(([, hhmm]) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const when = new Date(now);
+    when.setHours(h, m, 0, 0);
+    return when > now;
+  });
+
+  for (const [name, hhmm] of entries) {
+    const cell = document.createElement('div');
+    cell.className = 'time-cell' + (upcoming && upcoming[0] === name ? ' next' : '');
+    const n = document.createElement('div');
+    n.className = 'n';
+    n.textContent = name;
+    const v = document.createElement('div');
+    v.className = 't';
+    v.textContent = hhmm;
+    cell.append(n, v);
+    P.times.appendChild(cell);
+  }
+}
+
+async function showVersePreview() {
+  P.versePreview.hidden = true;
+  const r = await window.stats.previewVerse();
+  if (!r || !r.ok) {
+    P.versePreview.hidden = false;
+    P.versePreview.textContent = (r && r.error) || 'Could not load that verse.';
+    return;
+  }
+  P.versePreview.replaceChildren();
+  const ar = document.createElement('span');
+  ar.className = 'ar';
+  ar.textContent = r.verse.arabic;
+  const en = document.createElement('span');
+  en.className = 'en';
+  en.textContent = r.verse.english;
+  const rf = document.createElement('span');
+  rf.className = 'rf';
+  rf.textContent = `Quran ${r.verse.reference}${r.verse.surahName ? ' · ' + r.verse.surahName : ''}`;
+  P.versePreview.append(ar, en, rf);
+  P.versePreview.hidden = false;
+}
+
+P.surah.addEventListener('change', () => { syncAyahBound(); });
+
+P.adhan.addEventListener('change', () => {
+  // Choosing a listed recording clears a custom one, so the two controls
+  // can never disagree about which will actually play.
+  if (P.adhan.value !== '__custom__') P.adhanCustom.value = '';
+});
+
+P.save.addEventListener('click', async () => {
+  P.saved.textContent = 'Saving…';
+  const adhanUrl = P.adhanCustom.value.trim()
+    || (P.adhan.value === '__custom__' ? '' : P.adhan.value);
+  const next = await window.stats.savePrayer({
+    enabled: P.enabled.checked,
+    adhanUrl: adhanUrl || undefined,
+    reciter: P.reciter.value,
+    surah: Number(P.surah.value),
+    ayah: Number(P.ayah.value),
+    nameSeconds: Number(P.nameSecs.value),
+    verseDelayMinutes: Number(P.delay.value),
+    verseSeconds: Number(P.verseSecs.value),
+  });
+  renderPrayer(next);
+  P.saved.textContent = 'Saved';
+  setTimeout(() => { P.saved.textContent = ''; }, 2500);
+  showVersePreview();
+  renderTimes();
+});
+
+P.preview.addEventListener('click', () => {
+  window.stats.previewPrayer();
+  P.saved.textContent = 'Playing on the pill…';
+  setTimeout(() => { P.saved.textContent = ''; }, 4000);
+});
+
+window.stats.prayerSettings().then((s) => {
+  renderPrayer(s);
+  showVersePreview();
+  renderTimes();
+});
+
 /*
  * Today's numbers move while the window is open. One second matches the pill's
  * cadence and costs nothing — the payload is a few kilobytes over IPC.
