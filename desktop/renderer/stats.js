@@ -162,6 +162,43 @@ document.getElementById('open-folder').addEventListener('click', () => {
 
 window.stats.onChanged(() => { refresh(); });
 
+// ---------------------------------------------------------------------------
+// Version + update state
+// ---------------------------------------------------------------------------
+
+const versionEl = document.getElementById('version');
+const updateLine = document.getElementById('update-line');
+const updateBtn = document.getElementById('update-install');
+
+function renderUpdate(s) {
+  if (!s) return;
+  versionEl.textContent = `v${s.current}`;
+
+  if (s.state === 'downloading') {
+    // A percentage only helps if it moves; below 1% it reads as stuck.
+    updateLine.textContent = s.percent > 0
+      ? `Downloading ${s.version ?? 'update'}… ${s.percent}%`
+      : `Downloading ${s.version ?? 'update'}…`;
+    updateBtn.hidden = true;
+    return;
+  }
+
+  if (s.state === 'ready') {
+    updateLine.textContent = `Version ${s.version} is ready.`;
+    updateBtn.hidden = false;
+    return;
+  }
+
+  // 'idle', 'checking', or a failed check — say nothing. There is no action
+  // for the user to take, and a permanent "up to date" label is just noise.
+  updateLine.textContent = '';
+  updateBtn.hidden = true;
+}
+
+updateBtn.addEventListener('click', () => window.stats.installUpdate());
+window.stats.onUpdateStatus(renderUpdate);
+window.stats.updateStatus().then(renderUpdate);
+
 /*
  * Today's numbers move while the window is open. One second matches the pill's
  * cadence and costs nothing — the payload is a few kilobytes over IPC.

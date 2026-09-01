@@ -285,6 +285,33 @@ main {
   border-color: var(--ink-3);
 }
 
+.foot-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The version is the answer to "what am I running?" — always present, never
+   loud. It earns its place by being checkable, not by being noticed. */
+.version {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+#update-line { color: var(--ink-2); }
+
+#update-install {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#update-install:hover {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 @media (max-width: 640px) {
   .tiles { grid-template-columns: 1fr; }
 }

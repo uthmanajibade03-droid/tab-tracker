@@ -140,4 +140,14 @@ contextBridge.exposeInMainWorld('stats', {
   onChanged(callback) { return subscribe('stats:changed', callback); },
 
   openFolder() { ipcRenderer.send('stats:open-folder'); },
+
+  // ---- updates ----
+
+  /** Current version plus whether one is downloading or waiting to install. */
+  updateStatus() { return ipcRenderer.invoke('app:update-status'); },
+
+  onUpdateStatus(callback) { return subscribe('app:update-status', callback); },
+
+  /** Restart into the downloaded version. */
+  installUpdate() { ipcRenderer.send('app:install-update'); },
 });

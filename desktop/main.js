@@ -25,6 +25,7 @@ const readline = require('readline');
 const { spawn } = require('child_process');
 
 const prayer = require('./prayer');
+const updater = require('./updater');
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -1204,7 +1205,14 @@ function buildContextMenu() {
 function rebuildTrayMenu() {
   if (!tray) return;
   const visible = !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
+  const update = updater.getStatus();
   tray.setContextMenu(Menu.buildFromTemplate([
+    // Only ever shown once an update is actually downloaded and waiting, so
+    // the menu doesn't carry a dead entry the other 99% of the time.
+    ...(update.state === 'ready' ? [
+      { label: `Restart to update to ${update.version}`, click: () => updater.installNow() },
+      { type: 'separator' },
+    ] : []),
     { label: 'Open Tab Tracker', click: openStatsWindow },
     { label: visible ? 'Hide pill' : 'Show pill', click: togglePill },
     { type: 'separator' },
@@ -1262,6 +1270,15 @@ if (!app.requestSingleInstanceLock()) {
     startWatcher();
     startBridge();
 
+    updater.init({
+      onStatus: (s) => {
+        for (const win of [mainWindow, statsWindow]) {
+          if (win && !win.isDestroyed()) win.webContents.send('app:update-status', s);
+        }
+        rebuildTrayMenu();
+      },
+    });
+
     prayer.init({
       userDataPath: app.getPath('userData'),
       onAlert: (payload) => {
@@ -1296,6 +1313,11 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('stats:load', () => statsPayload());
   ipcMain.on('stats:open', openStatsWindow);
   ipcMain.on('stats:open-folder', openStatsFolder);
+
+  // -- updates --------------------------------------------------------------
+
+  ipcMain.handle('app:update-status', () => updater.getStatus());
+  ipcMain.on('app:install-update', () => updater.installNow());
 
   ipcMain.on('pill:context-menu', (event) => {
     notePillInteraction();

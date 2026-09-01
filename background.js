@@ -567,8 +567,20 @@ function husaryUrlForReference(ref) {
  * decoupled so the visitor sees a quick first ping and then a reflective
  * follow-up after a configurable delay, rather than one long single
  * animation. */
+/* The desktop app schedules prayers too, and it is the better place for them:
+   it fires whether or not the browser is open. When it's running, the browser
+   defers so the moment isn't announced twice. Checked at dispatch rather than
+   at schedule time, so closing the app mid-day hands the duty straight back. */
+function desktopOwnsPrayer() {
+  return !!(bridgeSocket && bridgeSocket.readyState === WebSocket.OPEN);
+}
+
 async function dispatchPrayerNameAlert(prayerName) {
   try {
+    if (desktopOwnsPrayer()) {
+      console.log('[Tab Tracker] desktop app is running — leaving the prayer alert to it');
+      return;
+    }
     const r = await chrome.storage.local.get('salahAlert');
     const alert = r.salahAlert || { enabled: true, nameSeconds: 5, verseDelayMinutes: 5, verseSeconds: 10 };
     if (alert.enabled === false) return;
@@ -605,6 +617,7 @@ async function dispatchPrayerNameAlert(prayerName) {
 
 async function dispatchVerseAlert(prayerName) {
   try {
+    if (desktopOwnsPrayer()) return; // see desktopOwnsPrayer()
     const r = await chrome.storage.local.get(['salahAlert', 'salahVerse']);
     const alert = r.salahAlert || { enabled: true, nameSeconds: 5, verseDelayMinutes: 5, verseSeconds: 10 };
     if (alert.enabled === false) return;

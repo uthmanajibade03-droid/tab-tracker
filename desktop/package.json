@@ -1,6 +1,6 @@
 {
   "name": "tab-tracker-desktop",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
   "main": "main.js",
@@ -10,6 +10,7 @@
     "dist": "electron-builder --win"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -24,6 +25,13 @@
       "buildResources": "build"
     },
     "asar": false,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "uthmanajibade03-droid",
+        "repo": "tab-tracker"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
