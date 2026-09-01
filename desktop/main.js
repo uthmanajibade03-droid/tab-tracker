@@ -101,7 +101,14 @@ const SCREEN_MARGIN = 24;
  * that takes over when Active Desktop / slideshow is on), while a real
  * Explorer file window is CabinetWClass and keeps tracking normally.
  */
-const DESKTOP_WINDOW_CLASSES = new Set(['Progman', 'WorkerW']);
+const DESKTOP_WINDOW_CLASSES = new Set([
+  // Windows
+  'Progman', 'WorkerW',
+  // macOS — Finder owns the desktop there exactly as explorer.exe does here,
+  // so the Mac helper reports this when Finder is frontmost with no real
+  // window on screen. Same rule, one place.
+  'FinderDesktop',
+]);
 
 /*
  * Raw Windows process name -> human display name. Keys are matched
@@ -910,6 +917,15 @@ function createWindow() {
     hasShadow: false,
     show: false,
     title: 'Tab Tracker',
+    /*
+     * macOS only: make the pill an NSPanel rather than an ordinary window.
+     *
+     * alwaysOnTop and visibleOnFullScreen are not enough on their own — a
+     * normal window still disappears the moment another app enters fullscreen,
+     * because that app gets its own Space and ordinary windows do not follow it
+     * there. A panel can, which is what every floating HUD on macOS uses.
+     */
+    ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
