@@ -1,0 +1,4 @@
+# Copy to `.dev.vars` for local `wrangler dev` runs. This file is only
+# ever read by the local dev server — the deployed Worker reads TT_TOKEN
+# from a Worker secret set with `wrangler secret put TT_TOKEN`.
+TT_TOKEN=local-dev-token-not-a-secret

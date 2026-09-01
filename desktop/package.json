@@ -1,0 +1,56 @@
+{
+  "name": "tab-tracker-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "install-electron",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "xyz.uthman.tabtracker",
+    "productName": "Tab Tracker",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "focus-watcher.ps1",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../icons",
+        "to": "icons",
+        "filter": ["*.png"]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "artifactName": "TabTracker-Setup.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Tab Tracker"
+    }
+  }
+}

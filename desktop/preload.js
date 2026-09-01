@@ -1,0 +1,111 @@
+'use strict';
+
+/*
+ * The only channel between the main process and the pill UI.
+ *
+ * The renderer runs with nodeIntegration disabled and contextIsolation on, so
+ * it has no access to Node, Electron, or IPC of its own. Everything it is
+ * allowed to do is enumerated here — a fixed list of functions, no raw
+ * ipcRenderer, and no way to name a channel the main process did not opt into.
+ *
+ * Nothing here trusts its arguments: every value is re-validated on the main
+ * side. This file's job is to keep the channel surface small, not to police it.
+ */
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+/**
+ * @typedef {Object} TrackerState
+ * @property {string|null} app       Friendly app name, or null when unknown.
+ * @property {string|null} domain    Domain from the browser extension, if fresh.
+ * @property {number}      activeMs  Today's total for `app`, in milliseconds.
+ * @property {'active'|'paused'|'idle'} status
+ */
+
+/**
+ * @typedef {Object} PillSettings
+ * @property {boolean} paused
+ */
+
+/**
+ * Subscribe to a main→renderer push.
+ *
+ * Deliberately drops the IpcRendererEvent argument: handing the renderer an
+ * event object would leak `sender`, and with it a path back to IPC that this
+ * API is meant to be the only door through.
+ */
+function subscribe(channel, callback) {
+  const listener = (_event, payload) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
+contextBridge.exposeInMainWorld('tracker', {
+  // ---- pushes from the main process ----
+
+  /**
+   * Tracker state (~1Hz, plus an immediate push on every focus change).
+   * @param {(state: TrackerState) => void} callback
+   * @returns {() => void} unsubscribe
+   */
+  onState(callback) { return subscribe('tracker:state', callback); },
+
+  /**
+   * Current settings, pushed on ready and whenever one of them changes.
+   * @param {(settings: PillSettings) => void} callback
+   */
+  onSettings(callback) { return subscribe('pill:settings', callback); },
+
+  /**
+   * Which side of the pill the panel ended up on: `{ direction: 'up'|'down' }`.
+   * Sent in reply to panelOpen(), once the window has actually been resized.
+   */
+  onPanelLayout(callback) { return subscribe('pill:panel-layout', callback); },
+
+  /** The window lost focus (the user clicked away); close the panel. */
+  onPanelDismiss(callback) { return subscribe('pill:panel-dismiss', callback); },
+
+  // ---- lifecycle ----
+
+  /** Tell the main process the UI is mounted and wants an initial push. */
+  ready() { ipcRenderer.send('pill:ready'); },
+
+  /** Ask the main process to pop up the pill's right-click menu. */
+  showContextMenu() { ipcRenderer.send('pill:context-menu'); },
+
+  // ---- window dragging ----
+  //
+  // The pill is no longer a -webkit-app-region: drag surface (that would eat
+  // the clicks the settings panel needs), so the renderer drives the drag and
+  // reports a cursor delta in DIPs relative to where the gesture started.
+
+  dragStart() { ipcRenderer.send('pill:drag-start'); },
+  dragMove(dx, dy) { ipcRenderer.send('pill:drag-move', dx, dy); },
+  dragEnd() { ipcRenderer.send('pill:drag-end'); },
+
+  // ---- resizing ----
+  //
+  // The pill's right edge is a grab handle. The renderer sends the width it
+  // wants; the main process clamps it, derives the height, and re-clamps the
+  // whole capsule to the display's work area.
+
+  resize(width) { ipcRenderer.send('pill:resize', width); },
+  resizeEnd() { ipcRenderer.send('pill:resize-end'); },
+
+  // ---- settings panel ----
+
+  /** Grow the window by `height` px to make room for the panel. */
+  panelOpen(height) { ipcRenderer.send('pill:panel-open', height); },
+
+  /** Shrink the window back to just the pill. */
+  panelClose() { ipcRenderer.send('pill:panel-close'); },
+
+  // ---- settings ----
+
+  setPaused(paused) { ipcRenderer.send('pill:set-paused', paused); },
+
+  /** Already confirmed in the panel; the main process does not ask again. */
+  resetToday() { ipcRenderer.send('pill:reset-today'); },
+
+  quit() { ipcRenderer.send('pill:quit'); },
+});

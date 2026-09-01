@@ -1,0 +1,406 @@
+/*
+ * The BrowserWindow is transparent, so the page itself must never paint a
+ * background — any opaque colour here would show up as a rectangle around the
+ * capsule. This is also why nothing in this file assumes a white page: the
+ * only surfaces with a colour are .pill and .panel, and they carry their own
+ * contrast.
+ */
+
+/* ---------------------------------------------------------------------------
+   Tokens
+   ---------------------------------------------------------------------------
+   The pill has one dimension the user controls: its width, set by dragging the
+   right edge. Everything else — height, padding, type, the dot — is derived
+   from --scale (width / 260), so the capsule keeps its proportions at every
+   size instead of turning into a differently-shaped object as it grows.
+
+   --scale and --pill-h are written by pill.js from window.innerWidth, using
+   the same formula main.js uses for the window bounds.
+*/
+body {
+  --scale: 1;
+  --pill-h: 52px;
+
+  --inset-x: calc(8px * var(--scale));   /* window edge -> capsule */
+  --inset-y: calc(6px * var(--scale));   /* also the pill<->panel gap */
+  --pad-x: calc(16px * var(--scale));
+  --gap: calc(10px * var(--scale));
+  --dot: calc(8px * var(--scale));
+  --fs: calc(13px * var(--scale));
+  --fs-time: calc(12px * var(--scale));
+
+  /* The panel is a menu, not part of the HUD, so it tracks the pill's size
+     only loosely — enough to feel related, not enough to become a billboard. */
+  --fs-panel: clamp(11px, calc(12px * var(--scale)), 15px);
+
+  /* Product accent. Used only for the dot and focus rings. */
+  --accent: #209C64;
+  --accent-light: #4DDB9B;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  /* The pill is a HUD, not a document; text selection and the I-beam cursor
+     would both be wrong here. */
+  user-select: none;
+  cursor: default;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Shell
+   ---------------------------------------------------------------------------
+   `order` rather than column-reverse: reversing the axis would also reverse
+   how the items pack when the window is momentarily taller than the content
+   (which it is, for one frame, on every resize). Swapping order keeps normal
+   top-down packing in both directions.
+
+   flex-shrink is disabled on both children because the panel is MEASURED
+   while the window is still pill-sized — if it were allowed to shrink to fit,
+   the height reported to the main process would be the squashed one.
+*/
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pill { order: 1; }
+.panel { order: 2; }
+body.panel-up .pill { order: 2; }
+body.panel-up .panel { order: 1; }
+
+/* ---------------------------------------------------------------------------
+   Pill
+   --------------------------------------------------------------------------- */
+
+.pill {
+  position: relative;
+  flex: 0 0 auto;
+  /* Inset from the window edge so the drop shadow has room to render instead
+     of being clipped at the bounds. */
+  margin: var(--inset-y) var(--inset-x);
+  height: calc(var(--pill-h) - 2 * var(--inset-y));
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 0 var(--pad-x);
+
+  border-radius: 999px;
+  background: rgba(20, 22, 26, 0.82);
+  /* Two layered shadows: a soft ambient drop shadow for lift, and an inset
+     hairline that reads as a light catching the top edge of the glass. */
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.38),
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(14px) saturate(140%);
+
+  font-size: var(--fs);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.94);
+
+  /*
+   * NOT a -webkit-app-region: drag surface any more. On Windows a drag region
+   * is hit-tested as window caption, so mouse events never reach the renderer
+   * and the capsule could be dragged but never clicked. pill.js drives the
+   * drag itself and tells the difference between a drag and a click.
+   */
+  -webkit-app-region: no-drag;
+  cursor: default;
+}
+
+.pill:focus { outline: none; }
+.pill:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 2px;
+}
+
+/* ---- resize grip ---- */
+
+.grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: calc(var(--pad-x) + 2px);
+  border-radius: 0 999px 999px 0;
+  cursor: ew-resize;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+/* Two short strokes, only while the pointer is on the pill. */
+.grip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(var(--pad-x) * 0.35);
+  width: 2px;
+  height: calc(var(--pill-h) * 0.3);
+  transform: translateY(-50%);
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
+  border-right: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.pill:hover .grip,
+.grip:focus-visible,
+body.resizing .grip { opacity: 1; }
+
+.grip:focus { outline: none; }
+.grip:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: -2px;
+}
+
+/* ---- status dot ---- */
+
+.dot {
+  flex: 0 0 auto;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  transition: background-color 220ms ease, box-shadow 220ms ease;
+}
+
+.dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(32, 156, 100, 0.65);
+}
+
+.dot.paused {
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+}
+
+.dot.idle {
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+
+/* ---- content ---- */
+
+.content {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--gap) * 0.7);
+  min-width: 0; /* lets .app actually shrink so its ellipsis can trigger */
+  flex: 1 1 auto;
+
+  /* The cross-fade. Kept to opacity + a small lift: enough to register as a
+     change, not enough to read as movement. */
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.content.swapping {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
+.app {
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.domain {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Give up space before the app name does when both are long. */
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.sep {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.30);
+}
+
+.time {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: var(--fs-time);
+  color: rgba(255, 255, 255, 0.80);
+}
+
+/* ---------------------------------------------------------------------------
+   Settings panel — three actions, deliberately nothing more.
+   --------------------------------------------------------------------------- */
+
+/* An author `display` always beats the UA stylesheet's `[hidden] {display:none}`,
+   so every flex container in here has to restore it explicitly — otherwise the
+   panel would stay laid out (and measurable, and reachable by assistive tech)
+   while it is supposed to be gone. */
+.panel[hidden] { display: none; }
+
+.panel {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  margin: 0 var(--inset-x) var(--inset-y);
+  padding: 6px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  border-radius: calc(14px * var(--scale));
+  background: rgba(20, 22, 26, 0.94);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.46),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(18px) saturate(140%);
+
+  font-size: var(--fs-panel);
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.88);
+
+  -webkit-app-region: no-drag;
+
+  /* Closed / being measured: laid out (so offsetHeight is the real content
+     height) but invisible and inert. body.panel-open fades it in. */
+  opacity: 0;
+  transform: scale(0.97) translateY(-4px);
+  transform-origin: top center;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+body.panel-up .panel {
+  margin: var(--inset-y) var(--inset-x) 0;
+  transform: scale(0.97) translateY(4px);
+  transform-origin: bottom center;
+}
+
+/* Must follow the .panel-up block: same specificity, later source wins. */
+body.panel-open .panel,
+body.panel-up.panel-open .panel {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.rule {
+  height: 1px;
+  margin: 3px 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- rows ---- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.84);
+  font: inherit;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.row:focus { outline: none; }
+.row:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: -2px;
+}
+
+.row-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row.compact {
+  flex: 1 1 0;
+  justify-content: center;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+
+.row.compact:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Restrained, not alarming: a warm tint that only appears on hover. */
+.row.danger { color: rgba(240, 170, 160, 0.92); }
+.row.danger:hover {
+  background: rgba(196, 92, 78, 0.22);
+  color: rgba(255, 208, 200, 1);
+}
+
+/* ---- reset confirm step ---- */
+
+/* display: contents so the confirmation and its trigger are siblings in the
+   panel's own flex flow, and the panel's gap applies to both. */
+.reset { display: contents; }
+
+.confirm[hidden] { display: none; }
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin: 2px 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.confirm-text {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.confirm-actions { display: flex; gap: 6px; }
+
+/* Any interactive control must opt out of the drag region, or it will swallow
+   clicks in favour of window movement. Nothing in this window is a drag region
+   today, but this keeps that true if one is ever reintroduced. */
+button, a, input, label, .no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Respect the OS "reduce motion" setting: swap and open instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .dot,
+  .grip,
+  .panel,
+  .row {
+    transition: none;
+  }
+  .panel,
+  body.panel-up .panel { transform: none; }
+}

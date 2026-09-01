@@ -1,3 +1,9 @@
+/* Full local dashboard. Same shape as the source extension:
+ * day picker, sortable table, export JSON, clear. Reads from
+ * chrome.storage.local so the data shown is whatever this browser
+ * has accumulated — NOT the synced server view. For the cross-device
+ * server view, open the admin dashboard. */
+
 let allStats = {};
 let currentDay = null;
 let sortKey = 'activeMs';
@@ -106,10 +112,121 @@ document.getElementById('export').addEventListener('click', async () => {
   URL.revokeObjectURL(url);
 });
 
+document.getElementById('opts').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
+
 document.getElementById('clear').addEventListener('click', async () => {
-  if (!confirm('Delete all tracked data? This cannot be undone.')) return;
+  if (!confirm('Delete all locally tracked data? This cannot be undone. (Synced server data is not affected.)')) return;
   await chrome.storage.local.remove('stats');
   await load();
 });
 
+/* ───── Sync row ─────
+ * Renders the last-sync metadata + a manual "Sync now" trigger. The
+ * background script does its own ~1-min flush + sync; this button is
+ * for the "I just need it to land NOW" case (e.g. before closing the
+ * laptop, before showing the dashboard to a teammate). */
+
+function fmtRel(ts) {
+  if (!ts) return 'never';
+  const secs = Math.round((Date.now() - ts) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
+async function renderSyncRow(overrideBusyText) {
+  const row = document.getElementById('sync-row');
+  const { syncConfig, lastSyncAt, lastSyncStatus } = await chrome.storage.local.get([
+    'syncConfig', 'lastSyncAt', 'lastSyncStatus'
+  ]);
+  if (overrideBusyText) {
+    row.innerHTML = `<span class="status-busy">${overrideBusyText}</span>`;
+    return;
+  }
+  if (!syncConfig || !syncConfig.adminUrl || !syncConfig.token || !syncConfig.userId) {
+    row.innerHTML = `<span>Sync: not configured.</span> <a id="cfg" href="#">Set up →</a>`;
+    document.getElementById('cfg').addEventListener('click', e => {
+      e.preventDefault();
+      chrome.runtime.openOptionsPage();
+    });
+    return;
+  }
+  const cls = (lastSyncStatus && lastSyncStatus.startsWith('error')) ? 'status-err' : 'status-ok';
+  const detail = lastSyncStatus && lastSyncStatus !== 'ok' ? ` (${lastSyncStatus})` : '';
+  row.innerHTML = `<span>Synced as <b>${syncConfig.name ?? syncConfig.userId}</b></span><span class="${cls}">· Last sync: ${fmtRel(lastSyncAt)}${detail}</span>`;
+}
+
+document.getElementById('sync').addEventListener('click', async () => {
+  const btn = document.getElementById('sync');
+  btn.classList.add('spin');
+  btn.disabled = true;
+  await renderSyncRow('Syncing now…');
+  try {
+    await chrome.runtime.sendMessage({ type: 'syncNow' });
+  } catch { /* surfaced in status row */ }
+  await renderSyncRow();
+  btn.classList.remove('spin');
+  btn.disabled = false;
+});
+
+/* Re-render sync row when storage changes (background updates lastSyncAt). */
+chrome.storage.onChanged.addListener(changes => {
+  if (changes.lastSyncAt || changes.lastSyncStatus || changes.syncConfig) {
+    renderSyncRow();
+  }
+  if (changes.thresholdMinutes && typeof changes.thresholdMinutes.newValue === 'number') {
+    const el = document.getElementById('threshold');
+    if (el) el.value = String(changes.thresholdMinutes.newValue);
+  }
+});
+
+/* Threshold control in the header — saves to both chrome.storage.local
+ * (so the content script reacts immediately) and the admin server (so
+ * other devices pick it up on next sync). */
+async function loadThreshold() {
+  const r = await chrome.storage.local.get('thresholdMinutes');
+  const el = document.getElementById('threshold');
+  if (el) el.value = String(r.thresholdMinutes ?? 30);
+}
+async function saveThreshold() {
+  const el = document.getElementById('threshold');
+  if (!el) return;
+  const n = parseInt(el.value, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 1440) {
+    el.value = '30';
+    return;
+  }
+  await chrome.storage.local.set({ thresholdMinutes: n });
+  try {
+    const { syncConfig: cfg } = await chrome.storage.local.get('syncConfig');
+    if (cfg && cfg.adminUrl && cfg.token) {
+      await fetch(cfg.adminUrl.replace(/\/+$/, '') + '/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-tt-token': cfg.token },
+        body: JSON.stringify({ thresholdMinutes: n }),
+      });
+    }
+  } catch {}
+  const saved = document.getElementById('threshold-saved');
+  if (saved) {
+    saved.style.display = 'inline';
+    setTimeout(() => { saved.style.display = 'none'; }, 1800);
+  }
+}
+const thresholdInput = document.getElementById('threshold');
+if (thresholdInput) {
+  thresholdInput.addEventListener('blur', saveThreshold);
+  thresholdInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); thresholdInput.blur(); }
+  });
+}
+
 load();
+renderSyncRow();
+loadThreshold();

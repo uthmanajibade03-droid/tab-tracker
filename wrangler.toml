@@ -1,0 +1,17 @@
+# Cloudflare Workers config for the Tab Tracker marketing site.
+# Deploys the static files in ./site to https://tabtracker.uthman.xyz
+#
+# Credentials are NEVER stored here. Deploy with them in the environment:
+#   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npx wrangler@latest deploy
+
+name = "tabtracker"
+compatibility_date = "2025-09-01"
+
+# Assets-only Worker: no script, Cloudflare serves ./site directly.
+[assets]
+directory = "./site"
+
+# Binds the apex-subdomain to this Worker and provisions the DNS record.
+[[routes]]
+pattern = "tabtracker.uthman.xyz"
+custom_domain = true

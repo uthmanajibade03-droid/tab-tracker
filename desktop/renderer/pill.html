@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!--
+    Defence in depth. The pill only ever renders local files and never loads
+    remote content, so this policy blocks everything by default and permits
+    only same-directory scripts/styles. `file:` is listed alongside 'self'
+    because Chromium treats file:// documents as opaque origins, where 'self'
+    alone does not reliably match sibling files.
+  -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:;" />
+  <title>Tab Tracker</title>
+  <link rel="stylesheet" href="pill.css" />
+</head>
+<body>
+  <!--
+    The window is transparent; the capsule and the panel are the only painted
+    surfaces. They are siblings in a flex column so that the panel can be put
+    above the pill (via `order`) when the pill sits near the bottom of a
+    display and the window has to grow upward.
+  -->
+  <div class="shell" id="shell">
+
+    <div class="pill" id="pill"
+         role="button" tabindex="0"
+         aria-haspopup="dialog" aria-expanded="false" aria-controls="panel"
+         aria-label="Tab Tracker — open settings">
+      <span class="dot" id="dot" aria-hidden="true"></span>
+
+      <!-- Cross-faded as a unit whenever the focused app changes. -->
+      <div class="content" id="content">
+        <span class="app" id="app">Waiting…</span>
+        <span class="sep" id="domain-sep" hidden>·</span>
+        <span class="domain" id="domain" hidden></span>
+        <span class="sep">·</span>
+        <span class="time" id="time">0m 00s</span>
+      </div>
+
+      <!-- Grab the right edge to resize. Exposed as a slider so it is also
+           reachable from the keyboard (arrows nudge, Home/End jump). -->
+      <div class="grip" id="grip"
+           role="slider" tabindex="0"
+           aria-label="Pill size" aria-orientation="horizontal"
+           title="Drag to resize"></div>
+    </div>
+
+    <div class="panel" id="panel" role="dialog" aria-label="Tab Tracker settings" hidden>
+
+      <button class="row" type="button" id="pause">
+        <span class="row-label" id="pause-label">Pause tracking</span>
+      </button>
+
+      <div class="reset">
+        <button class="row" type="button" id="reset" aria-expanded="false">
+          <span class="row-label">Reset today's stats…</span>
+        </button>
+        <div class="confirm" id="reset-confirm" hidden>
+          <p class="confirm-text">Delete all of today's tracked time?</p>
+          <div class="confirm-actions">
+            <button class="row compact" type="button" id="reset-cancel">Cancel</button>
+            <button class="row compact danger" type="button" id="reset-go">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule"></div>
+
+      <button class="row" type="button" id="quit">
+        <span class="row-label">Quit Tab Tracker</span>
+      </button>
+
+    </div>
+  </div>
+
+  <script src="pill.js"></script>
+</body>
+</html>

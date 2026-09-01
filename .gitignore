@@ -5,3 +5,10 @@ Thumbs.db
 node_modules/
 .vscode/
 .idea/
+
+# Build output — regenerate with `npm run dist` (pill) and build_zip.ps1 (extension)
+desktop/release/
+site/downloads/
+
+# Wrangler local state
+.wrangler/

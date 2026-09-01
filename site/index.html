@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tab Tracker</title>
+<meta name="description" content="Tab Tracker counts the time you actually spend in every app and on every site. A floating desktop pill for Windows and a browser extension for Chrome and Edge. Local by default.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ink: #111412;
+    --body: #5a625e;
+    --muted: #6b726e;
+    --line: #e9eae9;
+    --wash: #f5f6f5;
+    --green: #209C64;
+    --green-dark: #12603D;
+    --green-light: #4DDB9B;
+    --maxw: 900px;
+    --pad: 24px;
+    --sans: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+  }
+
+  a { color: inherit; }
+
+  a:focus-visible,
+  .btn:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  /* ---------- header ---------- */
+
+  .site-head { padding: 34px 0 0; }
+
+  .wordmark {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  .wordmark .t { color: var(--green); }
+
+  /* ---------- hero ---------- */
+
+  .hero { padding: clamp(64px, 11vw, 116px) 0 clamp(48px, 8vw, 76px); }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.35rem, 6.2vw, 3.9rem);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    max-width: 15ch;
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin: 26px 0 0;
+    max-width: 47ch;
+    font-size: 1.0625rem;
+    color: var(--body);
+  }
+
+  /* ---------- pill mock ---------- */
+
+  figure { margin: clamp(44px, 7vw, 66px) 0 0; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 20px;
+    border-radius: 999px;
+    background: #17191a;
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 14px 30px -18px rgba(0,0,0,.55);
+  }
+  .pill .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-light);
+    flex: none;
+  }
+  .pill .sep { color: #7e8683; }
+  .pill .time { color: #a3aba7; font-variant-numeric: tabular-nums; }
+
+  figcaption {
+    margin-top: 18px;
+    max-width: 42ch;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+
+  /* ---------- shared section bits ---------- */
+
+  section { padding: clamp(56px, 9vw, 92px) 0 0; }
+
+  h2 {
+    margin: 0 0 30px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ---------- downloads ---------- */
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  .grid > * { min-width: 0; }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 30px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .card p.desc {
+    margin: 14px 0 0;
+    font-size: 0.9375rem;
+    color: var(--body);
+  }
+
+  .btn {
+    align-self: flex-start;
+    margin-top: 26px;
+    display: inline-block;
+    padding: 11px 20px;
+    border-radius: 8px;
+    background: var(--green);
+    color: #fff;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    line-height: 1.2;
+    text-decoration: none;
+    transition: background-color 160ms ease;
+  }
+  .btn:hover { background: var(--green-dark); }
+
+  .note {
+    margin: 20px 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--wash);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ---------- what it does ---------- */
+
+  ul.points {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+  ul.points li {
+    border-bottom: 1px solid var(--line);
+    padding: 17px 0;
+    font-size: 0.9375rem;
+    color: var(--body);
+  }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    margin-top: clamp(64px, 10vw, 104px);
+    padding: 26px 0 44px;
+  }
+  footer .wrap {
+    display: flex;
+    gap: 26px;
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 160ms ease;
+  }
+  footer a:hover { color: var(--ink); }
+
+  /* ---------- small screens ---------- */
+
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }
+    .card { padding: 26px 22px; }
+    h1 { max-width: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap">
+    <span class="wordmark"><span class="t">Tab</span> Tracker</span>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <div class="hero">
+      <h1>Know where your hours actually go.</h1>
+      <p class="lede">Tab Tracker counts the time you really spend in every app and on every site — quietly, in the background, and stored on your own machine.</p>
+
+      <figure>
+        <span class="pill" aria-hidden="true">
+          <span class="dot"></span>
+          <span class="app">Google Chrome</span>
+          <span class="sep">·</span>
+          <span class="time" id="t">12m 04s</span>
+        </span>
+        <figcaption>The desktop pill: the app you're in, and today's time in it, on top of every window.</figcaption>
+      </figure>
+    </div>
+
+    <section aria-labelledby="dl">
+      <h2 id="dl">Download</h2>
+      <div class="grid">
+
+        <div class="card">
+          <h3>Desktop pill</h3>
+          <p class="desc">Tracks time per application across your whole computer, not just the browser.</p>
+          <a class="btn" href="downloads/TabTracker-Setup.exe" download>Download for Windows</a>
+          <p class="note">Run the installer. The pill appears on top of your windows and starts counting.</p>
+        </div>
+
+        <div class="card">
+          <h3>Browser extension</h3>
+          <p class="desc">Tracks sites and active time, with a timer badge on every page, to-dos and reminders.</p>
+          <a class="btn" href="downloads/tab-tracker.zip" download>Download for Chrome &amp; Edge</a>
+          <p class="note">Unzip it. Open <code>chrome://extensions</code> and turn on Developer mode, then click Load unpacked and choose the folder.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section aria-labelledby="what">
+      <h2 id="what">What it does</h2>
+      <ul class="points">
+        <li>Counts active time only while you're really there — focused window, not idle.</li>
+        <li>A quiet timer badge on every page, showing today's time on that site.</li>
+        <li>To-dos, overuse alerts when you linger too long on a site, and prayer-time reminders.</li>
+        <li>Local by default. Team sync and voice calls stay optional.</li>
+      </ul>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a href="../PRIVACY.md">Privacy</a>
+    <a href="https://github.com/uthmanajibade03-droid/tab-tracker">GitHub</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var el = document.getElementById('t');
+  if (!el) return;
+  var s = 724;
+  setInterval(function () {
+    s += 1;
+    var m = Math.floor(s / 60), sec = s % 60;
+    var h = Math.floor(m / 60);
+    m = m % 60;
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    el.textContent = h ? h + 'h ' + pad(m) + 'm' : m + 'm ' + pad(sec) + 's';
+  }, 1000);
+})();
+</script>
+
+</body>
+</html>

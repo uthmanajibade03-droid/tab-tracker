@@ -1,0 +1,52 @@
+# Tab Tracker rendezvous API — Cloudflare Worker.
+#
+# Serves the voice-call rendezvous endpoints that used to live on
+# admin.tayst.live. Audio is peer-to-peer; this Worker only brokers
+# "who is online" and "who wants to join whose call".
+#
+# Deploy (credentials are NEVER stored in this file):
+#   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npx wrangler@latest deploy
+#
+# The shared secret is a Worker secret, not a var:
+#   npx wrangler@latest secret put TT_TOKEN
+
+name = "tabtracker-api"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# ── Routing ────────────────────────────────────────────────────────────
+# A *separate* Worker ("tabtracker", see ../wrangler.toml) already owns
+# tabtracker.uthman.xyz via a Custom Domain. That is fine and supported:
+# per Cloudflare's docs, "Routes can fetch() Custom Domains and take
+# precedence if configured on the same hostname." So this path-pattern
+# route wins for /api/*, and every other path still falls through to the
+# static-site Worker on the Custom Domain. No DNS record is needed here —
+# the Custom Domain already created the proxied record for this hostname.
+[[routes]]
+pattern = "tabtracker.uthman.xyz/api/*"
+zone_name = "uthman.xyz"
+
+# ── Durable Object: the single rendezvous board ────────────────────────
+# Presence must be fresh within seconds. Workers KV is eventually
+# consistent with a 60-second minimum TTL — the entire staleness budget,
+# spent before the heartbeat even arrives. A Durable Object gives one
+# strongly-consistent instance that every client reads and writes.
+[[durable_objects.bindings]]
+name = "ROSTER"
+class_name = "Rendezvous"
+
+# SQLite-backed Durable Objects are available on the Workers Free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Rendezvous"]
+
+[vars]
+# This Worker is routed on /api/*, which is wider than the two paths it
+# implements. "false" (default): anything else under /api/ gets a JSON
+# 404. "true": it is handed on to the Custom Domain Worker with
+# fetch(request) instead — flip this if the site Worker ever grows its
+# own /api/ endpoints on this hostname.
+API_PASSTHROUGH = "false"
+
+[observability]
+enabled = true

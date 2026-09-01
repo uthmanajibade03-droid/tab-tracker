@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tab Tracker — offscreen (audio + voice)</title>
+</head>
+<body>
+  <!-- Single offscreen document. Chrome only allows ONE per extension,
+       so we combine both use-cases here:
+         AUDIO_PLAYBACK — Adhan + Quran verse recitation for prayer alerts
+         USER_MEDIA     — mic + WebRTC peer connections for team voice chat
+       Reasons array in background.js declares both when creating. -->
+  <audio id="audio" preload="none"></audio>
+
+  <!-- Voice call remote streams. offscreen.js appends one <audio> per
+       remote peer so mesh multi-party plays all voices simultaneously. -->
+  <div id="remoteAudios"></div>
+
+  <script src="peerjs.min.js"></script>
+  <script src="offscreen.js"></script>
+</body>
+</html>

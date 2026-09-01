@@ -1,0 +1,7 @@
+# Local secrets for `wrangler dev`. Never commit — the real token lives
+# in a Worker secret (`wrangler secret put TT_TOKEN`).
+.dev.vars
+
+# Wrangler's local state (miniflare SQLite for the Durable Object, etc.)
+.wrangler/
+node_modules/

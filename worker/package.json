@@ -1,0 +1,11 @@
+{
+  "name": "tabtracker-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voice-call rendezvous Worker for the Tab Tracker extension (presence + knocks). Audio stays peer-to-peer.",
+  "scripts": {
+    "dev": "wrangler dev --port 8787 --local",
+    "check": "node --check src/index.js && wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  }
+}
