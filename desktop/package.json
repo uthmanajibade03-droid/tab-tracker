@@ -3,6 +3,8 @@
   "version": "1.5.0",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
+  "author": "Uthman Ajibade",
+  "homepage": "https://tabtracker.uthman.xyz",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
