@@ -48,20 +48,6 @@ const PERSIST_DEBOUNCE_MS = 10000; // at most one disk write per 10s
 const WATCHER_HEARTBEAT_MS = 2000; // must match $HEARTBEAT_MS in focus-watcher.ps1
 const WATCHER_STALE_MS = 5000;     // no helper line for this long => unknown
 
-/*
- * How long our own window may hold the foreground, with the user not touching
- * it, before we conclude that the app they were in has gone away.
- *
- * This exists because the pill is always-on-top: when the focused application
- * exits, Windows activates the topmost remaining window — which is us. Ignoring
- * our own PID unconditionally (so that clicking the pill does not hijack the
- * timer) therefore used to pin the display, and the accrual, to an application
- * that no longer exists, indefinitely.
- */
-const SELF_FOCUS_GRACE_MS = 1000;
-/** How long after a click/drag/resize the pill still counts as "in use". */
-const PILL_ATTENTION_MS = 2500;
-
 const BRIDGE_STALE_MS = 10000;     // extension domain older than this => ignore
 const BRIDGE_PORT = 51314;
 const BRIDGE_HOST = '127.0.0.1';   // loopback only, never 0.0.0.0
@@ -457,31 +443,6 @@ let menuOpen = false;
 let alertActive = false;
 /** Window position captured at the start of a renderer-driven drag. */
 let dragOrigin = null;
-/** When our own window first became the foreground window; 0 when it is not. */
-let selfFocusSince = 0;
-/** Deadline until which the user is considered to still be using the pill. */
-let pillInteractionUntil = 0;
-
-/** Called from every gesture the renderer reports, to extend the grace above. */
-function notePillInteraction() {
-  pillInteractionUntil = Date.now() + PILL_ATTENTION_MS;
-}
-
-/** True while the pill plausibly has the user's deliberate attention. */
-function pillHasAttention() {
-  return panelOpen || dragOrigin !== null || Date.now() < pillInteractionUntil;
-}
-
-/**
- * True when our window has been the foreground one for longer than the grace
- * period without the user touching it — i.e. Windows handed us the foreground
- * because the application they were actually in disappeared.
- */
-function selfFocusOrphaned(now = Date.now()) {
-  if (selfFocusSince === 0) return false;
-  if (pillHasAttention()) return false;
-  return (now - selfFocusSince) > SELF_FOCUS_GRACE_MS;
-}
 
 /** The domain to display, or null when there is nothing fresh and relevant. */
 function liveDomain() {
@@ -556,13 +517,6 @@ function tick() {
    * credit that time to it. Clearing before the accrual below means the tick
    * in which we notice is dropped rather than misattributed.
    */
-  if (selfFocusOrphaned(now) && state.appName) {
-    state.appName = null;
-    state.rawName = null;
-    state.bridgeDomain = null;
-    state.bridgeDomainAt = 0;
-    broadcastFocus();
-  }
 
   const canAccrue = !state.paused && !state.idle && state.appName && !watcherStale;
   if (canAccrue) {
@@ -607,23 +561,27 @@ function onFocusSample(sample) {
   watcherRestarts = 0;
 
   /*
-   * Our own pill in the foreground means one of two very different things.
+   * The foreground window is one of ours. We do not have to infer which —
+   * Electron knows, so ask it rather than guessing from timing.
    *
-   * Usually the user just clicked or dragged it, and the timer must NOT jump
-   * to "Electron" — that is what this guard has always been for.
+   *   stats window → a real window the user is reading. Track it as the
+   *                  application it is; "Tab Tracker" is a true answer.
+   *   pill / voice → not a destination. The pill is a HUD floating over the
+   *                  user's actual work, and the hidden voice window is never
+   *                  shown at all. Neither is somewhere a person "spends
+   *                  time", so the honest answer is no focus.
    *
-   * But the pill is always-on-top, so Windows also activates it when the app
-   * the user was in exits. Holding the previous app in that case leaves a dead
-   * application on screen accruing time forever. selfFocusOrphaned() tells the
-   * two apart: deliberate attention (a gesture, or the settings panel being
-   * open) holds the previous app; silence past the grace period falls through
-   * below and clears it.
+   * Reporting no focus also handles the case that used to need a grace timer:
+   * the pill is always-on-top, so Windows activates it when the app the user
+   * was in exits. Previously that left a dead application accruing time until
+   * a heuristic noticed. Now it simply reads as what it is — the user is not
+   * in an application — and accrual stops immediately.
    */
-  if (sample.pid && sample.pid === process.pid) {
-    if (selfFocusSince === 0) selfFocusSince = Date.now();
-    if (!selfFocusOrphaned()) return;
-  } else {
-    selfFocusSince = 0;
+  const ours = !!(sample.pid && sample.pid === process.pid);
+  let ownWindow = null;
+  if (ours) {
+    const focused = BrowserWindow.getFocusedWindow();
+    ownWindow = (focused && statsWindow && focused === statsWindow) ? 'stats' : 'chrome';
   }
 
   /*
@@ -635,10 +593,12 @@ function onFocusSample(sample) {
    */
   const onDesktop = typeof sample.cls === 'string' && DESKTOP_WINDOW_CLASSES.has(sample.cls);
 
-  // selfFocusSince is still set here only on the orphaned path above, where
-  // the honest answer is "nothing", not "Electron".
-  const raw = (onDesktop || selfFocusSince !== 0) ? null : (sample.app || null);
-  const display = friendlyName(raw);
+  let display;
+  if (ownWindow === 'stats') display = 'Tab Tracker';
+  else if (ownWindow === 'chrome' || onDesktop) display = null;
+  else display = friendlyName(sample.app || null);
+
+  const raw = (ownWindow || onDesktop) ? null : (sample.app || null);
 
   if (display === state.appName) return; // no transition
 
@@ -1445,7 +1405,6 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('voice:hangup', (_e, peerId) => voiceCommand('hangup', { peerId }));
 
   ipcMain.on('pill:context-menu', (event) => {
-    notePillInteraction();
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
     const menu = buildContextMenu();
@@ -1464,14 +1423,12 @@ if (!app.requestSingleInstanceLock()) {
    * cursor delta and distinguishes a click from a drag itself.
    */
   ipcMain.on('pill:drag-start', () => {
-    notePillInteraction();
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const [x, y] = mainWindow.getPosition();
     dragOrigin = { x, y };
   });
 
   ipcMain.on('pill:drag-move', (event, dx, dy) => {
-    notePillInteraction();
     if (!dragOrigin || !mainWindow || mainWindow.isDestroyed()) return;
     const nx = Number(dx);
     const ny = Number(dy);
@@ -1482,7 +1439,6 @@ if (!app.requestSingleInstanceLock()) {
   // Fires on every press of the pill, drag or click, so it must be cheap:
   // rememberPillPosition() no-ops when nothing actually moved.
   ipcMain.on('pill:drag-end', () => {
-    notePillInteraction();
     dragOrigin = null;
     rememberPillPosition();
   });
@@ -1496,7 +1452,6 @@ if (!app.requestSingleInstanceLock()) {
    * panel on the correct side of the pill before fading it in.
    */
   ipcMain.on('pill:panel-open', (event, rawHeight) => {
-    notePillInteraction();
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const extra = Math.round(Number(rawHeight));
     if (!Number.isFinite(extra) || extra <= 0) return;
@@ -1513,7 +1468,6 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   ipcMain.on('pill:panel-close', () => {
-    notePillInteraction();
     if (!mainWindow || mainWindow.isDestroyed() || !panelOpen) return;
     const origin = pillOrigin();
     panelOpen = false;
@@ -1559,22 +1513,18 @@ if (!app.requestSingleInstanceLock()) {
    * so the resize event Chromium already fires is the feedback channel.
    */
   ipcMain.on('pill:resize', (event, width) => {
-    notePillInteraction();
     setPillWidth(width);
   });
 
   ipcMain.on('pill:resize-end', () => {
-    notePillInteraction();
     saveUiState({ immediate: true });
   });
 
   ipcMain.on('pill:set-paused', (event, paused) => {
-    notePillInteraction();
     setPaused(paused === true);
   });
 
   ipcMain.on('pill:reset-today', () => {
-    notePillInteraction();
     // The panel does its own two-step confirmation, so no dialog here.
     performResetToday();
   });
