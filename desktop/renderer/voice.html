@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Hidden window. It exists because WebRTC and getUserMedia are browser APIs —
+  the main process has neither, so something with a DOM has to hold the peer
+  connections and the microphone. Nothing here is ever shown.
+
+  connect-src covers the PeerJS broker's signalling socket; media-src is not
+  needed because remote audio arrives as a MediaStream, not a URL.
+-->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' file:; connect-src https://0.peerjs.com wss://0.peerjs.com;">
+<title>Tab Tracker voice</title>
+</head>
+<body>
+  <!-- One <audio> per remote peer is appended here so an N-way mesh call
+       plays every participant simultaneously. -->
+  <div id="remote-audio"></div>
+
+  <script src="peerjs.min.js"></script>
+  <script src="voice-client.js"></script>
+</body>
+</html>

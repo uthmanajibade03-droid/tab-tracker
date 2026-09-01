@@ -1,6 +1,6 @@
 {
   "name": "tab-tracker-desktop",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
   "main": "main.js",
@@ -33,8 +33,7 @@
       }
     ],
     "files": [
-      "main.js",
-      "preload.js",
+      "*.js",
       "renderer/**",
       "focus-watcher.ps1",
       "package.json"
