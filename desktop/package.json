@@ -1,6 +1,6 @@
 {
   "name": "tab-tracker-desktop",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
   "author": "Uthman Ajibade",
@@ -49,7 +49,10 @@
       "category": "public.app-category.productivity",
       "artifactName": "TabTracker-mac-${arch}.zip",
       "identity": null,
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Tab Tracker uses your microphone only while you are on a call with a teammate."
+      }
     },
     "extraResources": [
       {

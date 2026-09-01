@@ -493,6 +493,53 @@ body.alert-open .pill {
 .peer-row button.hangup { border-color: rgba(255, 120, 120, 0.45); color: #ffaeae; }
 .peer-row button.hangup:hover { background: rgba(255, 120, 120, 0.16); }
 
+/* Joining someone else's call is a different act from starting one, so it
+   does not wear the same button. */
+.peer-row button.join { border-color: rgba(224, 163, 60, 0.5); color: #f0c078; }
+.peer-row button.join:hover:not(:disabled) { background: rgba(224, 163, 60, 0.16); }
+
+/* ---------------------------------------------------------------------------
+   On a call
+
+   A steady green breath around the capsule. It has to be visible without the
+   panel open and without reading any text — the question it answers is "is my
+   microphone live right now", and that deserves an answer you cannot miss.
+
+   Kept as a box-shadow ring so it composes with the prayer and overuse states
+   instead of fighting them for the background.
+   --------------------------------------------------------------------------- */
+
+body.in-call .pill {
+  animation: pill-in-call 2.2s ease-in-out infinite;
+}
+
+@keyframes pill-in-call {
+  0%, 100% {
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.42),
+      inset 0 0 0 1px rgba(77, 219, 155, 0.55),
+      0 0 0 0 rgba(77, 219, 155, 0.40);
+  }
+  50% {
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.42),
+      inset 0 0 0 1px rgba(77, 219, 155, 0.55),
+      0 0 0 6px rgba(77, 219, 155, 0);
+  }
+}
+
+/* The status dot goes green and stays green for the duration of the call. */
+body.in-call .dot { background: #4DDB9B !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  body.in-call .pill {
+    animation: none;
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.42),
+      inset 0 0 0 1px rgba(77, 219, 155, 0.55);
+  }
+}
+
 .peers-empty {
   font-size: 10.5px;
   color: rgba(255, 255, 255, 0.35);

@@ -1405,6 +1405,19 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow.webContents.send('pill:call', { state: 'ended', peerId });
   });
 
+  /*
+   * Something the user needs told — a denied microphone above all. Resolved to
+   * a name here, where the roster lives, so the pill can say "Kemi didn't
+   * answer" rather than echoing a peer id at somebody.
+   */
+  ipcMain.on('voice:notify', (_e, msg) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !msg) return;
+    mainWindow.webContents.send('pill:voice-notice', {
+      kind: msg.kind,
+      name: msg.detail ? voice.nameForPeer(msg.detail) : null,
+    });
+  });
+
   // -- voice: UI → main -----------------------------------------------------
 
   // -- prayer settings ------------------------------------------------------
@@ -1418,6 +1431,7 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('voice:snapshot', () => voice.snapshot());
   ipcMain.handle('voice:set-config', (_e, cfg) => voice.setConfig(cfg));
   ipcMain.handle('voice:dial', (_e, peerId) => voiceCommand('dial', { peerId }));
+  ipcMain.handle('voice:join', (_e, peerIds) => voiceCommand('join', { peerIds }));
   ipcMain.handle('voice:accept', (_e, peerId) => voiceCommand('accept', { peerId }));
   ipcMain.handle('voice:decline', (_e, peerId) => voiceCommand('decline', { peerId }));
   ipcMain.handle('voice:hangup', (_e, peerId) => voiceCommand('hangup', { peerId }));
@@ -1560,6 +1574,7 @@ if (!app.requestSingleInstanceLock()) {
     persistBrowserNow();
     saveUiState({ immediate: true });
     stopWatcher();
+    voice.withdraw();  // take ourselves off the roster before we go
     if (bridgeServer) { try { bridgeServer.close(); } catch { /* ignore */ } }
   });
 }

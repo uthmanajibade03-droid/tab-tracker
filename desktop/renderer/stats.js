@@ -222,15 +222,14 @@ let editingSettings = false;
   el.addEventListener('blur', () => { editingSettings = false; });
 });
 
-function peerRow(p, inCallPeerIds) {
+function peerRow(p, inCall) {
   const row = document.createElement('div');
   row.className = 'peer';
 
   const dot = document.createElement('span');
   dot.className = 'peer-dot';
-  const talking = inCallPeerIds.has(p.peerId);
   if (!p.reachable) dot.classList.add('away');
-  else if (p.busy && !talking) dot.classList.add('busy');
+  else if (p.busy && !p.withUs) dot.classList.add('busy');
 
   const name = document.createElement('span');
   name.className = 'peer-name';
@@ -238,21 +237,35 @@ function peerRow(p, inCallPeerIds) {
 
   const state = document.createElement('span');
   state.className = 'peer-state';
-  if (talking) state.textContent = 'in call with you';
+  if (p.withUs) state.textContent = 'in call with you';
+  else if (p.ringing) state.textContent = 'ringing…';
   else if (!p.reachable) state.textContent = 'connecting…';
   else if (p.busy) state.textContent = 'in a call';
 
   const btn = document.createElement('button');
-  if (talking) {
+  if (p.withUs) {
     btn.textContent = 'Hang up';
     btn.className = 'hangup';
     btn.addEventListener('click', () => window.stats.hangUp(p.peerId));
-  } else {
-    btn.textContent = 'Call';
+  } else if (p.ringing) {
+    btn.textContent = 'Ringing…';
+    btn.disabled = true;
+  } else if (p.busy) {
+    /* Joining a mesh call means ringing every participant — each of them gets
+       an ordinary incoming call to accept or decline. */
+    btn.textContent = 'Join';
     btn.disabled = !p.reachable;
     btn.addEventListener('click', async () => {
       btn.disabled = true;
-      btn.textContent = 'Calling…';
+      btn.textContent = 'Ringing…';
+      await window.stats.join(p.party);
+    });
+  } else {
+    btn.textContent = inCall ? 'Add' : 'Call';
+    btn.disabled = !p.reachable;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Ringing…';
       const r = await window.stats.dial(p.peerId);
       if (r && r.ok === false) {
         btn.textContent = 'Failed';
@@ -286,10 +299,16 @@ function renderVoice(snap) {
   }
 
   if (snap.error) voiceStatus.textContent = snap.error;
-  else if (!snap.connected) voiceStatus.textContent = 'connecting…';
-  else voiceStatus.textContent = snap.inCallWith.length ? 'in a call' : 'online';
+  else if (!snap.online) voiceStatus.textContent = 'connecting…';
+  else if (snap.inCall) {
+    // Name who, not just that — "in a call" alone leaves you wondering.
+    voiceStatus.textContent = 'in a call with ' + snap.connected.map(c => c.name).join(', ');
+  } else if (snap.ringingOut.length) {
+    voiceStatus.textContent = 'ringing ' + snap.ringingOut.map(c => c.name).join(', ') + '…';
+  } else {
+    voiceStatus.textContent = 'online';
+  }
 
-  const inCallPeerIds = new Set(snap.inCallWith.map(c => c.peerId));
   voiceRoster.replaceChildren();
   const people = snap.roster;
   if (!people.length) {
@@ -298,7 +317,7 @@ function renderVoice(snap) {
     return;
   }
   voiceEmpty.hidden = true;
-  for (const p of people) voiceRoster.appendChild(peerRow(p, inCallPeerIds));
+  for (const p of people) voiceRoster.appendChild(peerRow(p, snap.inCall));
 }
 
 vSave.addEventListener('click', async () => {

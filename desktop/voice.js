@@ -25,7 +25,7 @@ const DEFAULT_SERVER = 'https://tabtracker.uthman.xyz';
 let configPath = null;
 let config = { name: '', userId: '', token: '', serverUrl: DEFAULT_SERVER, enabled: true };
 
-let state = { peerId: null, inCallWith: [], ringingFrom: [], hasMic: false };
+let state = { peerId: null, connected: [], ringingIn: [], ringingOut: [], hasMic: false };
 let roster = [];
 let lastError = null;
 
@@ -128,7 +128,10 @@ async function heartbeat() {
         // Advertise ourselves before the broker has assigned an id, so a
         // teammate at least sees we are here rather than nothing at all.
         peerId: state.peerId || `pending-${config.userId}`,
-        callWith: peerIdsToUserIds(state.inCallWith),
+        /* Only CONNECTED peers. Advertising someone we are merely ringing
+           would show us as busy to the whole roster for a call that may never
+           be answered — and would make us un-callable in the meantime. */
+        callWith: peerIdsToUserIds(state.connected),
       }),
     });
     if (!res.ok) {
@@ -168,30 +171,52 @@ async function pollRoster() {
 /** Roster + our own call state, shaped for the UI. */
 function snapshot() {
   const byPeer = new Map(roster.map(p => [p.peerId, p]));
+  const byUser = new Map(roster.map(p => [p.userId, p]));
+  const describe = pid => {
+    const p = byPeer.get(pid);
+    return { peerId: pid, name: p ? p.name : 'Someone', userId: p ? p.userId : null };
+  };
+
+  const inCall = state.connected.length > 0;
+
   return {
     configured: configured(),
     config: getConfig(),
     peerId: state.peerId,
-    connected: !!state.peerId,
+    online: !!state.peerId,
     hasMic: state.hasMic,
     error: lastError,
-    inCallWith: state.inCallWith.map(pid => {
-      const p = byPeer.get(pid);
-      return { peerId: pid, name: p ? p.name : 'Someone', userId: p ? p.userId : null };
+    inCall,
+    connected: state.connected.map(describe),
+    ringingIn: state.ringingIn.map(describe),
+    ringingOut: state.ringingOut.map(describe),
+    roster: roster.map((p) => {
+      /*
+       * Everyone this person is talking to, resolved to peer ids. Joining a
+       * mesh call means dialling every participant, so the UI needs the whole
+       * group — not just the one name it happens to be looking at.
+       */
+      const partyPeerIds = [p.peerId];
+      for (const uid of (Array.isArray(p.callWith) ? p.callWith : [])) {
+        const other = byUser.get(uid);
+        if (other && other.peerId && !partyPeerIds.includes(other.peerId)) {
+          partyPeerIds.push(other.peerId);
+        }
+      }
+      return {
+        userId: p.userId,
+        name: p.name,
+        peerId: p.peerId,
+        // A "pending-" id means their client is up but the broker has not
+        // assigned them an id yet; calling it would fail.
+        reachable: typeof p.peerId === 'string' && !p.peerId.startsWith('pending-'),
+        busy: Array.isArray(p.callWith) && p.callWith.length > 0,
+        // Are WE already talking to them?
+        withUs: state.connected.includes(p.peerId),
+        ringing: state.ringingOut.includes(p.peerId),
+        party: partyPeerIds,
+      };
     }),
-    ringingFrom: state.ringingFrom.map(pid => {
-      const p = byPeer.get(pid);
-      return { peerId: pid, name: p ? p.name : 'Someone', userId: p ? p.userId : null };
-    }),
-    roster: roster.map(p => ({
-      userId: p.userId,
-      name: p.name,
-      peerId: p.peerId,
-      // A "pending-" id means their client is up but the broker has not
-      // assigned them an id yet; calling it would fail.
-      reachable: typeof p.peerId === 'string' && !p.peerId.startsWith('pending-'),
-      busy: Array.isArray(p.callWith) && p.callWith.length > 0,
-    })),
   };
 }
 
@@ -200,12 +225,15 @@ function emit() { onEvent(snapshot()); }
 // -- called by main.js when the hidden client reports ------------------------
 
 function onClientState(next) {
-  const wasRinging = state.ringingFrom.length;
+  const wasConnected = state.connected.length;
   state = { ...state, ...next };
   // A fresh peer id should reach teammates now, not up to 24 seconds later.
   if (next.peerId && configured()) heartbeat().catch(() => {});
-  if (state.ringingFrom.length !== wasRinging) emit();
-  else emit();
+  /* Joining or leaving a call changes what we advertise, and a roster that
+     lags by up to 24 seconds is how two people end up unable to tell whether
+     a call is live. Push it immediately. */
+  if (state.connected.length !== wasConnected && configured()) heartbeat().catch(() => {});
+  emit();
 }
 
 function init({ userDataPath, send, onUpdate }) {
@@ -228,6 +256,25 @@ function stop() {
   if (rosterTimer) { clearInterval(rosterTimer); rosterTimer = null; }
 }
 
+/*
+ * Take ourselves off the roster on the way out.
+ *
+ * Without this, quitting leaves us listed as online — and, if we were mid-call,
+ * listed as busy — for the full presence TTL. A teammate would see someone who
+ * is not there, and calling them would ring into nothing. Fire-and-forget: quit
+ * must not wait on the network.
+ */
+function withdraw() {
+  if (!configured()) return;
+  try {
+    fetch(`${base()}/api/admin/presence?user=${encodeURIComponent(config.userId)}`, {
+      method: 'DELETE',
+      headers: headers(),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* shutting down anyway */ }
+}
+
 /** Look up the display name behind a peer id, for the pill's ring card. */
 function nameForPeer(peerId) {
   const p = roster.find(x => x.peerId === peerId);
@@ -235,6 +282,6 @@ function nameForPeer(peerId) {
 }
 
 module.exports = {
-  init, stop, setConfig, getConfig, snapshot, emit,
+  init, stop, withdraw, setConfig, getConfig, snapshot, emit,
   onClientState, nameForPeer, configured, heartbeat, pollRoster,
 };

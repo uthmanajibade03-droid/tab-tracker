@@ -526,8 +526,13 @@ function showAlert(payload) {
     alertEls.ref.hidden = !verse.reference;
   } else {
     alertEls.arabic.hidden = true;
-    alertEls.english.textContent = 'It is time for prayer.';
-    alertEls.english.hidden = false;
+    /* A notice supplies its own line; a prayer name card always says the same
+       thing. Empty message means "show no second line at all". */
+    const body = payload.kind === 'notice'
+      ? (payload.message || '')
+      : 'It is time for prayer.';
+    alertEls.english.textContent = body;
+    alertEls.english.hidden = !body;
     alertEls.ref.hidden = true;
   }
 
@@ -586,18 +591,113 @@ function showIncomingCall({ peerId, name }) {
 alertEls.answer.addEventListener('click', async () => {
   const peerId = ringingPeerId;
   if (!peerId) return;
+  stopRinging();
   // Close first: the card's job ends the moment the decision is made, and
-  // leaving it up through the mic prompt reads as if nothing happened.
+  // leaving it up through the microphone prompt reads as if nothing happened.
   closeAlert();
   const r = await window.tracker.answerCall(peerId);
+  /*
+   * A failure here already surfaced as a notice from the voice client, which
+   * knows WHY it failed. Not silently swallowed — just not reported twice.
+   */
   if (r && r.ok === false) console.warn('[pill] answer failed:', r.error);
 });
 
 alertEls.decline.addEventListener('click', () => {
   const peerId = ringingPeerId;
+  stopRinging();
   closeAlert();
   if (peerId) window.tracker.declineCall(peerId);
 });
+
+// ---------------------------------------------------------------------------
+// Ringtone
+//
+// Synthesised rather than shipped as an mp3: nothing to bundle, nothing to
+// fetch, and it cannot fail because a file was missing from a build. Two short
+// bursts every three seconds — the familiar cadence.
+//
+// A ringing call with no sound is a missed call. The card alone is not enough
+// when the pill may be sitting in the corner of a screen nobody is looking at.
+// ---------------------------------------------------------------------------
+
+let ringCtx = null;
+let ringTimer = null;
+
+function ringBurst(ctx, at) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(480, at);
+  // Ramped rather than switched, so it reads as a chirp instead of a click.
+  gain.gain.setValueAtTime(0, at);
+  gain.gain.linearRampToValueAtTime(0.18, at + 0.02);
+  gain.gain.setValueAtTime(0.18, at + 0.32);
+  gain.gain.linearRampToValueAtTime(0, at + 0.4);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(at);
+  osc.stop(at + 0.42);
+}
+
+function startRinging() {
+  if (ringTimer) return; // already ringing for someone
+  try {
+    if (!ringCtx) ringCtx = new AudioContext();
+    // An AudioContext can start suspended; without this the ring is silent.
+    if (ringCtx.state === 'suspended') ringCtx.resume().catch(() => {});
+    const cycle = () => {
+      const now = ringCtx.currentTime;
+      ringBurst(ringCtx, now);
+      ringBurst(ringCtx, now + 0.6);
+    };
+    cycle();
+    ringTimer = setInterval(cycle, 3000);
+  } catch (err) {
+    console.warn('[pill] ringtone unavailable:', err && err.message);
+  }
+}
+
+function stopRinging() {
+  if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+}
+
+// ---------------------------------------------------------------------------
+// Voice notices
+//
+// Reuses the alert card. A failed call must say why — "your microphone was
+// blocked" is actionable, a card that silently disappears is not.
+// ---------------------------------------------------------------------------
+
+const NOTICE_TEXT = {
+  'mic-denied': ['Microphone blocked', 'Allow microphone access for Tab Tracker in your system settings, then try again.'],
+  'mic-missing': ['No microphone', 'No microphone was found. Plug one in and try again.'],
+  'mic-failed': ['Microphone unavailable', "Your microphone couldn't be opened. Another app may be using it."],
+  'no-answer': ['No answer', null],
+  declined: ['Call declined', null],
+  'missed-call': ['Missed call', null],
+  'peer-unavailable': ['Not reachable', "They're not online any more."],
+  'call-failed': ['Call failed', 'The connection dropped.'],
+  'call-ended': ['Call ended', null],
+};
+
+function showNotice(kind, name) {
+  const entry = NOTICE_TEXT[kind];
+  if (!entry) return;
+  const [title, detail] = entry;
+  const byName = {
+    'no-answer': name ? `${name} didn't pick up.` : '',
+    declined: name ? `${name} declined.` : '',
+    'missed-call': name ? `You missed a call from ${name}.` : '',
+    'call-ended': name ? `Your call with ${name} ended.` : '',
+  }[kind];
+  showAlert({
+    kind: 'notice',
+    prayer: title,
+    message: detail || byName || '',
+    // A microphone problem needs reading and acting on; the rest are FYI.
+    seconds: kind.startsWith('mic-') ? 12 : 6,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Teammates in the settings panel
@@ -614,15 +714,19 @@ const peersEls = {
 };
 
 function renderPeers(snap) {
+  /* The glow is driven from here because this is where call state arrives.
+     It must survive the panel being closed — being on a call is a property of
+     the app, not of a menu the user happens to have open. */
+  document.body.classList.toggle('in-call', !!(snap && snap.inCall));
+
   if (!snap || !snap.configured) {
     peersEls.root.hidden = true;
     return;
   }
   peersEls.root.hidden = false;
   peersEls.status.textContent = snap.error ? 'offline'
-    : snap.connected ? '' : 'connecting…';
+    : snap.online ? (snap.inCall ? 'in a call' : '') : 'connecting…';
 
-  const inCall = new Set(snap.inCallWith.map(c => c.peerId));
   peersEls.list.replaceChildren();
 
   if (!snap.roster.length) {
@@ -639,9 +743,8 @@ function renderPeers(snap) {
 
     const dot = document.createElement('span');
     dot.className = 'dot';
-    const talking = inCall.has(p.peerId);
     if (!p.reachable) dot.classList.add('away');
-    else if (p.busy && !talking) dot.classList.add('busy');
+    else if (p.busy && !p.withUs) dot.classList.add('busy');
 
     const who = document.createElement('span');
     who.className = 'who';
@@ -649,16 +752,39 @@ function renderPeers(snap) {
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    if (talking) {
+
+    if (p.withUs) {
+      // Already talking to them.
       btn.textContent = 'Hang up';
       btn.className = 'hangup';
       btn.addEventListener('click', () => window.tracker.hangUp(p.peerId));
-    } else {
-      btn.textContent = 'Call';
+    } else if (p.ringing) {
+      // We dialled and they have not picked up yet.
+      btn.textContent = 'Ringing…';
+      btn.disabled = true;
+    } else if (p.busy) {
+      /*
+       * They are on a call with someone else. A mesh has no "the call" to be
+       * let into — joining means ringing every participant, and each of them
+       * gets an ordinary incoming call to accept or decline. That is the
+       * notification and consent, with no extra server state to keep in sync.
+       */
+      btn.textContent = 'Join';
+      btn.className = 'join';
       btn.disabled = !p.reachable;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = 'Calling…';
+        btn.textContent = 'Ringing…';
+        await window.tracker.join(p.party);
+      });
+    } else {
+      // Free. "Add" while we are already in a call — same action, but the word
+      // says what it does to the call rather than describing it from scratch.
+      btn.textContent = snap.inCall ? 'Add' : 'Call';
+      btn.disabled = !p.reachable;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Ringing…';
         await window.tracker.dial(p.peerId);
       });
     }
@@ -678,10 +804,19 @@ window.tracker.voiceSnapshot().then(renderPeers);
 
 window.tracker.onCall((msg) => {
   if (!msg) return;
-  if (msg.state === 'ringing') { showIncomingCall(msg); return; }
-  // 'ended' — the caller hung up, it timed out, or another surface answered.
-  // Only tear down if this card is still showing that same call.
-  if (msg.state === 'ended' && ringingPeerId === msg.peerId) closeAlert();
+  if (msg.state === 'ringing') { startRinging(); showIncomingCall(msg); return; }
+  // 'ended' — they hung up, it timed out, or we answered. Either way the
+  // ringing stops; the card only closes if it is still showing that call.
+  if (msg.state === 'ended') {
+    stopRinging();
+    if (ringingPeerId === msg.peerId) closeAlert();
+  }
+});
+
+window.tracker.onVoiceNotice((n) => {
+  if (!n) return;
+  stopRinging();
+  showNotice(n.kind, n.name);
 });
 
 // ---------------------------------------------------------------------------

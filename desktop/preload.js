@@ -139,7 +139,11 @@ contextBridge.exposeInMainWorld('tracker', {
   voiceSnapshot() { return ipcRenderer.invoke('voice:snapshot'); },
   onVoice(callback) { return subscribe('voice:update', callback); },
   dial(peerId) { return ipcRenderer.invoke('voice:dial', peerId); },
+  join(peerIds) { return ipcRenderer.invoke('voice:join', peerIds); },
   hangUp(peerId) { return ipcRenderer.invoke('voice:hangup', peerId); },
+
+  /** Something the user must be told — a denied mic, an unanswered call. */
+  onVoiceNotice(callback) { return subscribe('pill:voice-notice', callback); },
 });
 
 /*
@@ -172,6 +176,7 @@ contextBridge.exposeInMainWorld('stats', {
   onVoice(callback) { return subscribe('voice:update', callback); },
   saveVoiceConfig(cfg) { return ipcRenderer.invoke('voice:set-config', cfg); },
   dial(peerId) { return ipcRenderer.invoke('voice:dial', peerId); },
+  join(peerIds) { return ipcRenderer.invoke('voice:join', peerIds); },
   hangUp(peerId) { return ipcRenderer.invoke('voice:hangup', peerId); },
 
   // ---- prayer ----
@@ -203,6 +208,7 @@ contextBridge.exposeInMainWorld('voiceBridge', {
   state(s) { ipcRenderer.send('voice:state', s); },
   ring(peerId) { ipcRenderer.send('voice:ring', peerId); },
   ringEnded(peerId) { ipcRenderer.send('voice:ring-ended', peerId); },
+  notify(msg) { ipcRenderer.send('voice:notify', msg); },
   result(id, payload) { ipcRenderer.send('voice:result', id, payload); },
   onCommand(callback) { return subscribe('voice:command', callback); },
 });

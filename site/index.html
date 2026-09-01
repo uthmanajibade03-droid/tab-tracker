@@ -184,6 +184,21 @@
   }
   .btn:hover { background: var(--green-dark); }
 
+  /* The second architecture. Quieter than the primary button because most
+     people want the first one — it is there to be found, not to compete. */
+  .btn-alt {
+    align-self: flex-start;
+    margin-top: 10px;
+    display: inline-block;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1px;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .btn-alt:hover { color: var(--ink); border-color: var(--muted); }
+
   .note {
     margin: 20px 0 0;
     font-size: 0.8125rem;
@@ -316,28 +331,42 @@
 
 <script>
 /*
- * The pill is Windows-only for now. A Mac visitor clicking "Download for
- * Windows" gets a file their machine cannot open, so say so plainly rather
- * than letting them find out after a 100MB download. The extension does work
- * on macOS, so point them at the half they can actually use.
+ * Serve each visitor the build their machine can actually run.
+ *
+ * The default markup is Windows, so only Mac needs swapping. Apple Silicon and
+ * Intel are different binaries and the browser cannot reliably tell them apart
+ * — navigator.platform says "MacIntel" on both — so rather than guess wrong and
+ * hand someone a file that will not open, the Mac card offers both and says
+ * which is which in plain terms.
+ *
+ * The extra step is unavoidable and stated up front: the app is not code-signed,
+ * so macOS quarantines it and claims it is "damaged". It is not. Hiding that
+ * would just move the confusion to after the download.
  */
 (function () {
   var isMac = /Mac|iPhone|iPad/.test(navigator.platform || '') ||
               /Mac OS X/.test(navigator.userAgent || '');
   if (!isMac) return;
+
+  var REL = 'https://github.com/uthmanajibade03-droid/tab-tracker/releases/latest/download/';
   var btn = document.querySelector('.card .btn');
   var note = document.getElementById('dl-note');
-  if (btn) {
-    btn.textContent = 'Windows only for now';
-    btn.setAttribute('aria-disabled', 'true');
-    btn.style.background = 'transparent';
-    btn.style.color = 'var(--muted)';
-    btn.style.boxShadow = 'inset 0 0 0 1px var(--line)';
-    btn.removeAttribute('href');
-  }
-  if (note) {
-    note.textContent = "The desktop pill doesn't run on macOS yet. The browser extension does — grab that instead.";
-  }
+  if (!btn || !note) return;
+
+  btn.textContent = 'Download for Mac · Apple Silicon';
+  btn.setAttribute('href', REL + 'TabTracker-mac-arm64.zip');
+
+  var alt = document.createElement('a');
+  alt.className = 'btn-alt';
+  alt.href = REL + 'TabTracker-mac-x64.zip';
+  alt.textContent = 'Intel Mac';
+  btn.insertAdjacentElement('afterend', alt);
+
+  note.innerHTML =
+    'Unzip it and drag <b>Tab Tracker</b> into Applications. ' +
+    'The first time you open it macOS will say it is damaged — it is not, ' +
+    'it just is not signed yet. <b>Right-click the app and choose Open</b>, ' +
+    'then click Open again. You only do this once.';
 })();
 
 (function () {
