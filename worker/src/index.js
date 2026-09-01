@@ -234,6 +234,7 @@ export class Rendezvous {
 
     if (op === '/presence' && method === 'POST') return this.postPresence(request, now);
     if (op === '/presence' && method === 'GET') return this.getPresence();
+    if (op === '/presence' && method === 'DELETE') return this.deletePresence(url);
     if (op === '/knock' && method === 'POST') return this.postKnock(request, now);
     if (op === '/knock' && method === 'GET') return this.getKnocks(url);
     if (op === '/knock' && method === 'PATCH') return this.patchKnock(request);
@@ -272,6 +273,24 @@ export class Rendezvous {
 
     const [{ n }] = this.sql.exec('SELECT COUNT(*) AS n FROM presence').toArray();
     return Response.json({ ok: true, userId, online: n });
+  }
+
+  /*
+   * Withdraw a row immediately instead of waiting out PRESENCE_TTL_MS.
+   *
+   * Used when one client hands over to another — the browser extension
+   * stepping aside for the desktop app — so the person it was advertising
+   * stops appearing as a separate, callable teammate the moment the handover
+   * happens, rather than lingering on everyone's roster for a minute.
+   *
+   * Same trust model as the rest: a shared token, so this can only be as
+   * strict as the design already is.
+   */
+  deletePresence(url) {
+    const userId = idField(url.searchParams.get('user'), MAX_USER_ID);
+    if (!userId) return Response.json({ ok: false, error: 'bad-userId' }, { status: 400 });
+    this.sql.exec('DELETE FROM presence WHERE user_id = ?', userId);
+    return Response.json({ ok: true, userId });
   }
 
   getPresence() {
@@ -445,7 +464,7 @@ export default {
     }
 
     const allowed = {
-      '/api/admin/presence': ['GET', 'POST'],
+      '/api/admin/presence': ['GET', 'POST', 'DELETE'],
       '/api/admin/knock': ['GET', 'POST', 'PATCH', 'DELETE'],
     }[url.pathname];
     if (!allowed.includes(request.method)) {

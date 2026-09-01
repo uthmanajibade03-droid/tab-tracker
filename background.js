@@ -578,7 +578,36 @@ function husaryUrlForReference(ref) {
  * appear on the voice roster twice, with no way for a teammate to tell which
  * entry to call. */
 function desktopAppConnected() {
-  return !!(bridgeSocket && bridgeSocket.readyState === WebSocket.OPEN);
+  if (!bridgeSocket) return false;
+  /*
+   * CONNECTING counts as "yes, hold off".
+   *
+   * The service worker sleeps, and every wake re-runs bridgeConnect() while
+   * the presence alarm may fire in the same breath. Treating CONNECTING as
+   * "not connected" therefore let the extension advertise itself for one beat
+   * on every single wake — which is exactly how a phantom teammate ends up on
+   * the roster next to the desktop app.
+   *
+   * Being wrong in this direction is cheap: a refused loopback connection
+   * fails in milliseconds, so at worst one 24-second beat is skipped when the
+   * app genuinely is not running.
+   */
+  return bridgeSocket.readyState === WebSocket.OPEN
+      || bridgeSocket.readyState === WebSocket.CONNECTING;
+}
+
+/* Stop advertising this browser the moment the desktop app takes over, rather
+   than leaving a duplicate entry to age out of the roster on its own. */
+async function withdrawVoicePresence() {
+  try {
+    const { syncConfig } = await chrome.storage.local.get('syncConfig');
+    if (!voiceConfigured(syncConfig)) return;
+    await fetch(voiceEndpoint(syncConfig, '/api/admin/presence?user=' + encodeURIComponent(syncConfig.userId)), {
+      method: 'DELETE',
+      headers: voiceHeaders(syncConfig),
+    });
+    console.log('[Tab Tracker] desktop app took over voice — withdrew browser presence');
+  } catch { /* it expires on its own within the minute regardless */ }
 }
 
 async function dispatchPrayerNameAlert(prayerName) {
@@ -716,6 +745,7 @@ function bridgeConnect() {
        app is running the browser is not the one registered for calls, so its
        Voice tab must say so instead of offering a roster it isn't part of. */
     chrome.storage.local.set({ desktopAppConnected: true });
+    withdrawVoicePresence();
   });
   sock.addEventListener('close', () => {
     if (bridgeSocket === sock) bridgeSocket = null;

@@ -1333,8 +1333,20 @@ if (!app.requestSingleInstanceLock()) {
       },
     });
 
-    // Lets a shortcut (or a smoke test) land straight on the stats window.
-    if (process.argv.includes('--open-stats')) openStatsWindow();
+    /*
+     * Launching the app shows the app.
+     *
+     * Every launch is a deliberate act — there is no start-at-login — so
+     * arriving at only a pill, and having to find "Open Tab Tracker" inside it
+     * to actually see anything, makes the first click feel like it failed.
+     * This mirrors what a second launch already does via 'second-instance',
+     * so opening from the Start menu behaves the same whether or not the app
+     * happened to be running already.
+     *
+     * --background exists for anyone who wires up their own auto-start and
+     * wants just the pill.
+     */
+    if (!process.argv.includes('--background')) openStatsWindow();
     if (process.argv.includes('--demo-prayer')) {
       setTimeout(() => prayer.runDemo(), 1500);
     }
