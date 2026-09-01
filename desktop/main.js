@@ -16,7 +16,7 @@
 
 const {
   app, BrowserWindow, Menu, Tray, ipcMain,
-  screen, shell, dialog, powerMonitor, nativeImage, nativeTheme,
+  screen, shell, dialog, powerMonitor, nativeImage, nativeTheme, session,
 } = require('electron');
 
 const path = require('path');
@@ -26,6 +26,7 @@ const { spawn } = require('child_process');
 
 const prayer = require('./prayer');
 const updater = require('./updater');
+const voice = require('./voice');
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -1124,6 +1125,61 @@ function openStatsFolder() {
 }
 
 // ---------------------------------------------------------------------------
+// Voice
+//
+// WebRTC and getUserMedia are browser APIs, so a hidden window holds the peer
+// connections and the microphone while voice.js does the HTTP half from here.
+// The window is never shown and never navigates.
+// ---------------------------------------------------------------------------
+
+let voiceWindow = null;
+let voiceReady = false;
+const voicePending = new Map(); // request id -> resolve
+let voiceRequestId = 0;
+
+function createVoiceWindow() {
+  voiceWindow = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      // Not sandboxed: getUserMedia and RTCPeerConnection need a full
+      // renderer. Nothing untrusted is ever loaded here — one local file.
+      sandbox: false,
+      backgroundThrottling: false, // a hidden window must keep a call alive
+    },
+  });
+  voiceWindow.loadFile(path.join(__dirname, 'renderer', 'voice.html'));
+  voiceWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  voiceWindow.webContents.on('will-navigate', (e) => e.preventDefault());
+  voiceWindow.on('closed', () => { voiceWindow = null; voiceReady = false; });
+}
+
+/** Send a command to the hidden client; resolves with its reply. */
+function voiceCommand(action, params = {}) {
+  return new Promise((resolve) => {
+    if (!voiceWindow || voiceWindow.isDestroyed() || !voiceReady) {
+      resolve({ ok: false, error: 'voice-not-ready' });
+      return;
+    }
+    const id = ++voiceRequestId;
+    voicePending.set(id, resolve);
+    // Never leave a caller hanging on a renderer that died mid-request.
+    setTimeout(() => {
+      if (voicePending.has(id)) { voicePending.delete(id); resolve({ ok: false, error: 'timeout' }); }
+    }, 15000);
+    voiceWindow.webContents.send('voice:command', { ...params, action, id });
+  });
+}
+
+function pushVoice(snapshot) {
+  for (const win of [mainWindow, statsWindow]) {
+    if (win && !win.isDestroyed()) win.webContents.send('voice:update', snapshot);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stats window
 //
 // A normal, framed, resizable window — deliberately unlike the pill. The pill
@@ -1279,6 +1335,24 @@ if (!app.requestSingleInstanceLock()) {
       },
     });
 
+    createVoiceWindow();
+    voice.init({
+      userDataPath: app.getPath('userData'),
+      send: (msg) => voiceCommand(msg.action, msg),
+      onUpdate: pushVoice,
+    });
+
+    /*
+     * getUserMedia goes through Electron's permission gate. Grant media only
+     * to our own voice window — anything else asking is a bug, and a blanket
+     * allow would be a standing invitation to one.
+     */
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
+      const isVoice = voiceWindow && !voiceWindow.isDestroyed()
+        && contents === voiceWindow.webContents;
+      callback(permission === 'media' && !!isVoice);
+    });
+
     prayer.init({
       userDataPath: app.getPath('userData'),
       onAlert: (payload) => {
@@ -1318,6 +1392,47 @@ if (!app.requestSingleInstanceLock()) {
 
   ipcMain.handle('app:update-status', () => updater.getStatus());
   ipcMain.on('app:install-update', () => updater.installNow());
+
+  // -- voice: hidden client → main ------------------------------------------
+
+  ipcMain.on('voice:ready', () => {
+    voiceReady = true;
+    if (voice.configured()) {
+      voiceCommand('init', { userId: voice.getConfig().userId });
+    }
+  });
+
+  ipcMain.on('voice:state', (_e, s) => voice.onClientState(s || {}));
+
+  ipcMain.on('voice:result', (_e, id, result) => {
+    const resolve = voicePending.get(id);
+    if (!resolve) return;
+    voicePending.delete(id);
+    resolve(result);
+  });
+
+  ipcMain.on('voice:ring', (_e, peerId) => {
+    const name = voice.nameForPeer(peerId);
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    // A hidden pill cannot ring at anyone; bring it back so the call is
+    // answerable rather than silently missed.
+    if (!mainWindow.isVisible()) mainWindow.showInactive();
+    mainWindow.webContents.send('pill:call', { state: 'ringing', peerId, name });
+  });
+
+  ipcMain.on('voice:ring-ended', (_e, peerId) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send('pill:call', { state: 'ended', peerId });
+  });
+
+  // -- voice: UI → main -----------------------------------------------------
+
+  ipcMain.handle('voice:snapshot', () => voice.snapshot());
+  ipcMain.handle('voice:set-config', (_e, cfg) => voice.setConfig(cfg));
+  ipcMain.handle('voice:dial', (_e, peerId) => voiceCommand('dial', { peerId }));
+  ipcMain.handle('voice:accept', (_e, peerId) => voiceCommand('accept', { peerId }));
+  ipcMain.handle('voice:decline', (_e, peerId) => voiceCommand('decline', { peerId }));
+  ipcMain.handle('voice:hangup', (_e, peerId) => voiceCommand('hangup', { peerId }));
 
   ipcMain.on('pill:context-menu', (event) => {
     notePillInteraction();

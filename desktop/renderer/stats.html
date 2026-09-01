@@ -44,6 +44,41 @@
     <p class="empty" id="apps-empty" hidden>Nothing tracked on this day.</p>
   </section>
 
+  <section class="panel" aria-labelledby="h-voice">
+    <div class="panel-head">
+      <h2 id="h-voice">Voice</h2>
+      <span class="panel-note" id="voice-status"></span>
+    </div>
+
+    <div id="voice-roster"></div>
+    <p class="empty" id="voice-empty" hidden>Nobody else is online right now.</p>
+
+    <details class="voice-setup" id="voice-setup">
+      <summary>Voice settings</summary>
+      <p class="empty" style="margin-bottom:12px">
+        Only needed for calls. Everything else works without it. Teammates who
+        share the same token can see each other online and call directly —
+        audio goes peer to peer, never through the server.
+      </p>
+      <div class="field">
+        <label for="v-name">Your name</label>
+        <input id="v-name" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. Uthman">
+      </div>
+      <div class="field">
+        <label for="v-server">Voice server</label>
+        <input id="v-server" type="url" autocomplete="off" spellcheck="false" placeholder="https://tabtracker.uthman.xyz">
+      </div>
+      <div class="field">
+        <label for="v-token">Team token</label>
+        <input id="v-token" type="password" autocomplete="off" spellcheck="false" placeholder="paste your team's token">
+      </div>
+      <div class="field-actions">
+        <button type="button" id="v-save">Save</button>
+        <span id="v-saved"></span>
+      </div>
+    </details>
+  </section>
+
   <section class="panel" aria-labelledby="h-sites">
     <div class="panel-head">
       <h2 id="h-sites">Websites</h2>

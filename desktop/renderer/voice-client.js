@@ -163,6 +163,33 @@ async function dial(remotePeerId) {
     const call = peer.call(remotePeerId, stream);
     if (!call) return { ok: false, error: 'call-failed' };
     track(call);
+
+    /*
+     * PeerJS gives the caller no "they declined" signal — a callee that closes
+     * an unanswered call does not reliably surface as 'close' on this side. So
+     * an unanswered call would sit in activeCalls forever, showing us as busy
+     * to the whole roster and blocking a retry via the `already` short-circuit.
+     *
+     * The callee rings for RING_TIMEOUT_MS; give that a little room, and if no
+     * media has arrived by then, treat it as unanswered and tear it down.
+     */
+    const entry = activeCalls.get(remotePeerId);
+    let answered = false;
+    call.on('stream', () => { answered = true; });
+    setTimeout(() => {
+      if (answered) return;
+      if (activeCalls.get(remotePeerId) !== entry) return; // superseded already
+      log('no answer from', remotePeerId, '— giving up');
+      try { call.close(); } catch { /* already gone */ }
+      const stale = activeCalls.get(remotePeerId);
+      if (stale) {
+        if (stale.audioEl) { stale.audioEl.srcObject = null; stale.audioEl.remove(); }
+        activeCalls.delete(remotePeerId);
+      }
+      if (activeCalls.size === 0) releaseMic();
+      report();
+    }, RING_TIMEOUT_MS + 5000);
+
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err && err.message };

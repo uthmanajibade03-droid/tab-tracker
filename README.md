@@ -65,8 +65,14 @@ alarm without a user gesture.
 
 ### Voice calls
 
-Teammates online appear in the **Voice** tab of the popup and in the floating
-widget.
+Calling lives in **both** halves, with the desktop app taking priority: while it
+is running you stay reachable with the browser closed, and calls ring on the
+always-on-top pill. Close the app and the extension picks the duty back up, so
+only one of the two ever advertises you — a teammate never sees you listed
+twice.
+
+In the desktop app, teammates appear under **Voice** in the stats window. In the
+browser, they appear in the floating widget.
 
 - Click **Call** and it rings on their end. They see who's calling with
   **Answer** / **Decline**; their mic stays off until they answer. Unanswered

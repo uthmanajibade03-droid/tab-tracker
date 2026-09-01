@@ -1,6 +1,6 @@
 {
   "name": "tab-tracker-desktop",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
   "main": "main.js",

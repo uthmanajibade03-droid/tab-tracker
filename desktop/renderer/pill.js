@@ -469,10 +469,14 @@ const alertEls = {
   english: document.getElementById('alert-english'),
   ref: document.getElementById('alert-ref'),
   dismiss: document.getElementById('alert-dismiss'),
+  answer: document.getElementById('call-answer'),
+  decline: document.getElementById('call-decline'),
   audio: document.getElementById('alert-audio'),
 };
 
 let alertTimer = null;
+/** peerId of the call currently ringing on this card, if any. */
+let ringingPeerId = null;
 
 function stopAlertAudio() {
   try {
@@ -484,7 +488,9 @@ function stopAlertAudio() {
 
 function closeAlert() {
   if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
+  ringingPeerId = null;
   stopAlertAudio();
+  alertEls.root.classList.remove('calling');
   document.body.classList.remove('alert-open');
   // Let the fade finish before collapsing the window, or the card vanishes
   // instantly and the whole thing reads as a glitch rather than a dismissal.
@@ -497,6 +503,11 @@ function closeAlert() {
 
 function showAlert(payload) {
   if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
+  ringingPeerId = null;
+  alertEls.root.classList.remove('calling');
+  alertEls.dismiss.hidden = false;
+  alertEls.answer.hidden = true;
+  alertEls.decline.hidden = true;
   stopAlertAudio();
 
   const isVerse = payload.kind === 'prayer-verse';
@@ -544,6 +555,57 @@ function showAlert(payload) {
 
 alertEls.dismiss.addEventListener('click', closeAlert);
 window.tracker.onPrayer(showAlert);
+
+/*
+ * Incoming calls reuse the same card. The difference is that a call waits on
+ * a decision rather than expiring on a timer — no auto-close here; the hidden
+ * voice client declines after 30s and that arrives as state 'ended'.
+ */
+function showIncomingCall({ peerId, name }) {
+  if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
+  stopAlertAudio();
+  ringingPeerId = peerId;
+
+  alertEls.root.classList.add('calling');
+  alertEls.name.textContent = name || 'Someone';
+  alertEls.arabic.hidden = true;
+  alertEls.ref.hidden = true;
+  alertEls.english.textContent = 'is calling you';
+  alertEls.english.hidden = false;
+
+  alertEls.dismiss.hidden = true;
+  alertEls.answer.hidden = false;
+  alertEls.decline.hidden = false;
+
+  alertEls.root.hidden = false;
+  const height = Math.ceil(alertEls.root.offsetHeight + cssVarPx('--inset-y'));
+  window.tracker.alertOpen(height);
+  requestAnimationFrame(() => document.body.classList.add('alert-open'));
+}
+
+alertEls.answer.addEventListener('click', async () => {
+  const peerId = ringingPeerId;
+  if (!peerId) return;
+  // Close first: the card's job ends the moment the decision is made, and
+  // leaving it up through the mic prompt reads as if nothing happened.
+  closeAlert();
+  const r = await window.tracker.answerCall(peerId);
+  if (r && r.ok === false) console.warn('[pill] answer failed:', r.error);
+});
+
+alertEls.decline.addEventListener('click', () => {
+  const peerId = ringingPeerId;
+  closeAlert();
+  if (peerId) window.tracker.declineCall(peerId);
+});
+
+window.tracker.onCall((msg) => {
+  if (!msg) return;
+  if (msg.state === 'ringing') { showIncomingCall(msg); return; }
+  // 'ended' — the caller hung up, it timed out, or another surface answered.
+  // Only tear down if this card is still showing that same call.
+  if (msg.state === 'ended' && ringingPeerId === msg.peerId) closeAlert();
+});
 
 // ---------------------------------------------------------------------------
 // Global gestures

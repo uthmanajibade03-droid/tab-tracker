@@ -567,17 +567,23 @@ function husaryUrlForReference(ref) {
  * decoupled so the visitor sees a quick first ping and then a reflective
  * follow-up after a configurable delay, rather than one long single
  * animation. */
-/* The desktop app schedules prayers too, and it is the better place for them:
-   it fires whether or not the browser is open. When it's running, the browser
-   defers so the moment isn't announced twice. Checked at dispatch rather than
-   at schedule time, so closing the app mid-day hands the duty straight back. */
-function desktopOwnsPrayer() {
+/* Is the desktop companion running and connected over the bridge?
+ *
+ * When it is, it owns the features both halves implement — prayer alerts and
+ * voice presence — because it keeps working with the browser closed. Checked
+ * at the moment of use rather than cached, so quitting the app hands every
+ * duty straight back to the browser.
+ *
+ * Without this, a prayer would be announced twice and the same person would
+ * appear on the voice roster twice, with no way for a teammate to tell which
+ * entry to call. */
+function desktopAppConnected() {
   return !!(bridgeSocket && bridgeSocket.readyState === WebSocket.OPEN);
 }
 
 async function dispatchPrayerNameAlert(prayerName) {
   try {
-    if (desktopOwnsPrayer()) {
+    if (desktopAppConnected()) {
       console.log('[Tab Tracker] desktop app is running — leaving the prayer alert to it');
       return;
     }
@@ -617,7 +623,7 @@ async function dispatchPrayerNameAlert(prayerName) {
 
 async function dispatchVerseAlert(prayerName) {
   try {
-    if (desktopOwnsPrayer()) return; // see desktopOwnsPrayer()
+    if (desktopAppConnected()) return; // see desktopAppConnected()
     const r = await chrome.storage.local.get(['salahAlert', 'salahVerse']);
     const alert = r.salahAlert || { enabled: true, nameSeconds: 5, verseDelayMinutes: 5, verseSeconds: 10 };
     if (alert.enabled === false) return;
@@ -1548,6 +1554,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
  *     dials all participants automatically. */
 
 async function sendVoicePresence() {
+  /* The desktop app registers its own presence, and it is the better place to
+     be reachable from: it stays online with the browser closed, and the ring
+     lands on the always-on-top pill rather than on whatever page happens to be
+     open. Advertising from both would put the same person on the roster twice
+     with no way for a teammate to know which entry to call. */
+  if (desktopAppConnected()) return;
   const { syncConfig } = await chrome.storage.local.get('syncConfig');
   if (!voiceConfigured(syncConfig) || !syncConfig.name) return;
   await ensureOffscreenDocument(); // idempotent; brings Peer.js online if not yet

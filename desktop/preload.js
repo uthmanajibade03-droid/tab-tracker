@@ -125,6 +125,14 @@ contextBridge.exposeInMainWorld('tracker', {
 
   /** Shrink back to the bare pill once the alert has run its course. */
   alertClose() { ipcRenderer.send('pill:alert-close'); },
+
+  // ---- incoming calls ----
+
+  /** `{state: 'ringing', peerId, name}` or `{state: 'ended', peerId}`. */
+  onCall(callback) { return subscribe('pill:call', callback); },
+
+  answerCall(peerId) { return ipcRenderer.invoke('voice:accept', peerId); },
+  declineCall(peerId) { return ipcRenderer.invoke('voice:decline', peerId); },
 });
 
 /*
@@ -150,4 +158,27 @@ contextBridge.exposeInMainWorld('stats', {
 
   /** Restart into the downloaded version. */
   installUpdate() { ipcRenderer.send('app:install-update'); },
+
+  // ---- voice ----
+
+  voiceSnapshot() { return ipcRenderer.invoke('voice:snapshot'); },
+  onVoice(callback) { return subscribe('voice:update', callback); },
+  saveVoiceConfig(cfg) { return ipcRenderer.invoke('voice:set-config', cfg); },
+  dial(peerId) { return ipcRenderer.invoke('voice:dial', peerId); },
+  hangUp(peerId) { return ipcRenderer.invoke('voice:hangup', peerId); },
+});
+
+/*
+ * The hidden voice window's surface. Exposed on every window because they
+ * share one preload file, but only voice.html ever calls it — and the main
+ * process ignores these channels from any other sender by construction, since
+ * nothing else knows a pending request id.
+ */
+contextBridge.exposeInMainWorld('voiceBridge', {
+  ready() { ipcRenderer.send('voice:ready'); },
+  state(s) { ipcRenderer.send('voice:state', s); },
+  ring(peerId) { ipcRenderer.send('voice:ring', peerId); },
+  ringEnded(peerId) { ipcRenderer.send('voice:ring-ended', peerId); },
+  result(id, payload) { ipcRenderer.send('voice:result', id, payload); },
+  onCommand(callback) { return subscribe('voice:command', callback); },
 });

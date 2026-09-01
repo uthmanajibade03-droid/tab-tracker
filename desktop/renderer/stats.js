@@ -199,6 +199,125 @@ updateBtn.addEventListener('click', () => window.stats.installUpdate());
 window.stats.onUpdateStatus(renderUpdate);
 window.stats.updateStatus().then(renderUpdate);
 
+// ---------------------------------------------------------------------------
+// Voice
+// ---------------------------------------------------------------------------
+
+const voiceStatus = document.getElementById('voice-status');
+const voiceRoster = document.getElementById('voice-roster');
+const voiceEmpty = document.getElementById('voice-empty');
+const voiceSetup = document.getElementById('voice-setup');
+const vName = document.getElementById('v-name');
+const vServer = document.getElementById('v-server');
+const vToken = document.getElementById('v-token');
+const vSave = document.getElementById('v-save');
+const vSaved = document.getElementById('v-saved');
+
+let voiceSnap = null;
+// Don't overwrite what someone is mid-way through typing.
+let editingSettings = false;
+
+[vName, vServer, vToken].forEach(el => {
+  el.addEventListener('focus', () => { editingSettings = true; });
+  el.addEventListener('blur', () => { editingSettings = false; });
+});
+
+function peerRow(p, inCallPeerIds) {
+  const row = document.createElement('div');
+  row.className = 'peer';
+
+  const dot = document.createElement('span');
+  dot.className = 'peer-dot';
+  const talking = inCallPeerIds.has(p.peerId);
+  if (!p.reachable) dot.classList.add('away');
+  else if (p.busy && !talking) dot.classList.add('busy');
+
+  const name = document.createElement('span');
+  name.className = 'peer-name';
+  name.textContent = p.name;
+
+  const state = document.createElement('span');
+  state.className = 'peer-state';
+  if (talking) state.textContent = 'in call with you';
+  else if (!p.reachable) state.textContent = 'connecting…';
+  else if (p.busy) state.textContent = 'in a call';
+
+  const btn = document.createElement('button');
+  if (talking) {
+    btn.textContent = 'Hang up';
+    btn.className = 'hangup';
+    btn.addEventListener('click', () => window.stats.hangUp(p.peerId));
+  } else {
+    btn.textContent = 'Call';
+    btn.disabled = !p.reachable;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Calling…';
+      const r = await window.stats.dial(p.peerId);
+      if (r && r.ok === false) {
+        btn.textContent = 'Failed';
+        setTimeout(() => renderVoice(voiceSnap), 1500);
+      }
+    });
+  }
+
+  row.append(dot, name, state, btn);
+  return row;
+}
+
+function renderVoice(snap) {
+  if (!snap) return;
+  voiceSnap = snap;
+
+  if (!editingSettings) {
+    vName.value = snap.config.name || '';
+    vServer.value = snap.config.serverUrl || '';
+    // Never round-trip the secret into the DOM; a placeholder says it's set.
+    vToken.placeholder = snap.config.hasToken ? '•••••••• (saved)' : "paste your team's token";
+  }
+
+  if (!snap.configured) {
+    voiceStatus.textContent = 'not set up';
+    voiceRoster.replaceChildren();
+    voiceEmpty.hidden = false;
+    voiceEmpty.textContent = 'Add your name and team token below to appear online and call teammates.';
+    voiceSetup.open = true;
+    return;
+  }
+
+  if (snap.error) voiceStatus.textContent = snap.error;
+  else if (!snap.connected) voiceStatus.textContent = 'connecting…';
+  else voiceStatus.textContent = snap.inCallWith.length ? 'in a call' : 'online';
+
+  const inCallPeerIds = new Set(snap.inCallWith.map(c => c.peerId));
+  voiceRoster.replaceChildren();
+  const people = snap.roster;
+  if (!people.length) {
+    voiceEmpty.hidden = false;
+    voiceEmpty.textContent = 'Nobody else is online right now.';
+    return;
+  }
+  voiceEmpty.hidden = true;
+  for (const p of people) voiceRoster.appendChild(peerRow(p, inCallPeerIds));
+}
+
+vSave.addEventListener('click', async () => {
+  vSaved.textContent = 'Saving…';
+  const snap = await window.stats.saveVoiceConfig({
+    name: vName.value,
+    serverUrl: vServer.value,
+    token: vToken.value, // blank leaves the stored one alone
+  });
+  vToken.value = '';
+  editingSettings = false;
+  vSaved.textContent = snap && snap.name ? 'Saved' : 'Enter a name first';
+  setTimeout(() => { vSaved.textContent = ''; }, 2500);
+  window.stats.voiceSnapshot().then(renderVoice);
+});
+
+window.stats.onVoice(renderVoice);
+window.stats.voiceSnapshot().then(renderVoice);
+
 /*
  * Today's numbers move while the window is open. One second matches the pill's
  * cadence and costs nothing — the payload is a few kilobytes over IPC.
