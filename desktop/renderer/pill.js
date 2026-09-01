@@ -599,6 +599,83 @@ alertEls.decline.addEventListener('click', () => {
   if (peerId) window.tracker.declineCall(peerId);
 });
 
+// ---------------------------------------------------------------------------
+// Teammates in the settings panel
+//
+// The same roster the stats window shows, so placing a call doesn't require
+// opening the whole app. Hidden entirely when voice isn't set up, rather than
+// showing an empty section that begs a question.
+// ---------------------------------------------------------------------------
+
+const peersEls = {
+  root: document.getElementById('peers'),
+  status: document.getElementById('peers-status'),
+  list: document.getElementById('peers-list'),
+};
+
+function renderPeers(snap) {
+  if (!snap || !snap.configured) {
+    peersEls.root.hidden = true;
+    return;
+  }
+  peersEls.root.hidden = false;
+  peersEls.status.textContent = snap.error ? 'offline'
+    : snap.connected ? '' : 'connecting…';
+
+  const inCall = new Set(snap.inCallWith.map(c => c.peerId));
+  peersEls.list.replaceChildren();
+
+  if (!snap.roster.length) {
+    const empty = document.createElement('div');
+    empty.className = 'peers-empty';
+    empty.textContent = 'Nobody else online';
+    peersEls.list.appendChild(empty);
+    return;
+  }
+
+  for (const p of snap.roster) {
+    const row = document.createElement('div');
+    row.className = 'peer-row';
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    const talking = inCall.has(p.peerId);
+    if (!p.reachable) dot.classList.add('away');
+    else if (p.busy && !talking) dot.classList.add('busy');
+
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = p.name;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    if (talking) {
+      btn.textContent = 'Hang up';
+      btn.className = 'hangup';
+      btn.addEventListener('click', () => window.tracker.hangUp(p.peerId));
+    } else {
+      btn.textContent = 'Call';
+      btn.disabled = !p.reachable;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Calling…';
+        await window.tracker.dial(p.peerId);
+      });
+    }
+
+    row.append(dot, who, btn);
+    peersEls.list.appendChild(row);
+  }
+}
+
+window.tracker.onVoice((snap) => {
+  renderPeers(snap);
+  // Someone coming online while the panel is open changes its height; without
+  // this the window stays its old size and the new row is clipped off.
+  if (panel.open) syncPanelHeight();
+});
+window.tracker.voiceSnapshot().then(renderPeers);
+
 window.tracker.onCall((msg) => {
   if (!msg) return;
   if (msg.state === 'ringing') { showIncomingCall(msg); return; }

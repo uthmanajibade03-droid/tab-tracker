@@ -1307,8 +1307,18 @@ function createTray() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  /*
+   * Launching from the Start menu, a desktop shortcut, or Windows search
+   * starts a second process, which the lock above turns away. Without this it
+   * simply exits and the app appears not to open at all — the user's only way
+   * in is the pill. Treat a re-launch as "show me the app": that means the
+   * stats window, since that is what "opening Tab Tracker" means to a person.
+   */
   app.on('second-instance', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.showInactive();
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.showInactive();
+    }
+    openStatsWindow();
   });
 
   app.whenReady().then(() => {

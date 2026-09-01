@@ -133,6 +133,13 @@ contextBridge.exposeInMainWorld('tracker', {
 
   answerCall(peerId) { return ipcRenderer.invoke('voice:accept', peerId); },
   declineCall(peerId) { return ipcRenderer.invoke('voice:decline', peerId); },
+
+  // ---- roster, for the settings panel ----
+
+  voiceSnapshot() { return ipcRenderer.invoke('voice:snapshot'); },
+  onVoice(callback) { return subscribe('voice:update', callback); },
+  dial(peerId) { return ipcRenderer.invoke('voice:dial', peerId); },
+  hangUp(peerId) { return ipcRenderer.invoke('voice:hangup', peerId); },
 });
 
 /*

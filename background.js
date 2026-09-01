@@ -712,9 +712,14 @@ function bridgeConnect() {
     /* Send history straight away so a window opened before the browser was
        running doesn't sit empty until the next throttle window. */
     bridgeSendStats(true);
+    /* Content scripts can't see the socket, and they need to know: while the
+       app is running the browser is not the one registered for calls, so its
+       Voice tab must say so instead of offering a roster it isn't part of. */
+    chrome.storage.local.set({ desktopAppConnected: true });
   });
   sock.addEventListener('close', () => {
     if (bridgeSocket === sock) bridgeSocket = null;
+    chrome.storage.local.set({ desktopAppConnected: false });
     bridgeScheduleRetry();
   });
   /* 'error' always fires before 'close', so let close own the retry —
@@ -761,6 +766,10 @@ async function bridgeSendStats(force) {
   } catch { /* not worth retrying; the next tick will try again */ }
 }
 
+/* A stale `true` from a previous session would leave the Voice tab claiming
+   the app is handling calls when it isn't running. Start from false and let a
+   successful connection say otherwise. */
+chrome.storage.local.set({ desktopAppConnected: false });
 bridgeConnect();
 
 let state = {

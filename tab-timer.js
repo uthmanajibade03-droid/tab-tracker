@@ -647,6 +647,11 @@ if (window.top === window) {
           Sign in with your name to see who's online + call teammates.
           <br><button type="button" id="voice-setup">Open Settings</button>
         </div>
+        <div id="voice-on-desktop" class="voice-not-configured" hidden>
+          <b>Calls are handled by the Tab Tracker app.</b>
+          <br>You're reachable there even with the browser closed — incoming
+          calls ring on the pill. Open the app to see who's online.
+        </div>
         <div id="voice-content" hidden>
           <div class="voice-status-line">
             <h3>Voice chat</h3>
@@ -2299,6 +2304,7 @@ if (window.top === window) {
 
   const knockCountEl = shadow.querySelector('#knock-count');
   const voiceNotConfigured = shadow.querySelector('#voice-not-configured');
+  const voiceOnDesktop = shadow.querySelector('#voice-on-desktop');
   const voiceContent = shadow.querySelector('#voice-content');
   const voiceStatus = shadow.querySelector('#voice-status');
   const voiceStatusLabel = shadow.querySelector('#voice-status-label');
@@ -2320,11 +2326,14 @@ if (window.top === window) {
   let vIncoming = [];
   let vLastError = null;
   let vOutgoingKnockId = null;
+  let vDesktopActive = false;
 
   async function loadVoiceState() {
     const r = await chrome.storage.local.get([
-      'syncConfig', 'voiceState', 'voicePresence', 'voiceKnocks', 'voiceLastError', 'voiceIncoming'
+      'syncConfig', 'voiceState', 'voicePresence', 'voiceKnocks', 'voiceLastError',
+      'voiceIncoming', 'desktopAppConnected'
     ]);
+    vDesktopActive = r.desktopAppConnected === true;
     vCfg = r.syncConfig || null;
     vState = r.voiceState || vState;
     vPresence = Array.isArray(r.voicePresence) ? r.voicePresence : [];
@@ -2377,6 +2386,19 @@ if (window.top === window) {
   }
 
   function renderVoice() {
+    /* While the desktop app is connected it — not this browser — is the one
+       registered for calls. Showing a roster here would list the user's own
+       app as a teammate and offer to call it, and any "in call" state derived
+       from that roster is about the app, not about this tab. */
+    if (vDesktopActive) {
+      voiceContent.hidden = true;
+      voiceNotConfigured.hidden = true;
+      voiceOnDesktop.hidden = false;
+      updateVoiceBadgeState({ inCall: false, incoming: 0 });
+      return;
+    }
+    voiceOnDesktop.hidden = true;
+
     if (!vCfg || !vCfg.userId) {
       voiceContent.hidden = true;
       voiceNotConfigured.hidden = false;
@@ -2405,8 +2427,24 @@ if (window.top === window) {
     const mine = myMeeting(meetings);
     const inCall = !!(mine && mine.size >= 2);
 
-    if (inCall) {
-      const others = Array.from(mine).filter(u => u !== vCfg.userId).map(voiceNameOf);
+    /* Only count participants still on the roster. A `callWith` entry can
+       outlive the person it names — they close their browser mid-call and
+       their presence expires — which otherwise renders as "In call with"
+       followed by nothing, next to a Hang up button for a call that ended. */
+    const others = inCall
+      ? Array.from(mine)
+          .filter(u => u !== vCfg.userId)
+          .filter(u => vPresence.some(p => p.userId === u))
+          .map(voiceNameOf)
+          .filter(Boolean)
+      : [];
+
+    /* One source of truth from here down: a "call" with nobody still present
+       is not a call, and the badge and button labels must agree with what the
+       banner says rather than each deciding for themselves. */
+    const reallyInCall = others.length > 0;
+
+    if (reallyInCall) {
       inCallNames.textContent = others.join(', ');
       inCallEl.hidden = false;
     } else {
@@ -2523,7 +2561,7 @@ if (window.top === window) {
       nameSpan.innerHTML = `<span class="dot"></span>${voiceEscapeHTML(p.name)}${isPending ? '<span class="meta">(connecting)</span>' : ''}`;
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = inCall ? 'Add' : 'Call';
+      btn.textContent = reallyInCall ? 'Add' : 'Call';
       btn.disabled = isPending || !vState.peerId;
       btn.addEventListener('click', () => voiceCallUser(p));
       li.appendChild(nameSpan);
@@ -2534,7 +2572,7 @@ if (window.top === window) {
 
     /* A ringing call counts toward the badge the same way a knock does,
        so the pulse shows up even when the panel is closed. */
-    updateVoiceBadgeState({ inCall, incoming: pending.length + vIncoming.length });
+    updateVoiceBadgeState({ inCall: reallyInCall, incoming: pending.length + vIncoming.length });
   }
 
   function updateVoiceBadgeState({ inCall, incoming }) {
@@ -2597,7 +2635,8 @@ if (window.top === window) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.syncConfig || changes.voiceState || changes.voicePresence ||
-        changes.voiceKnocks || changes.voiceLastError || changes.voiceIncoming) {
+        changes.voiceKnocks || changes.voiceLastError || changes.voiceIncoming ||
+        changes.desktopAppConnected) {
       loadVoiceState().then(renderVoice);
     }
   });

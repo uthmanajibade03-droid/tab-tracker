@@ -48,6 +48,15 @@
 
     <div class="panel" id="panel" role="dialog" aria-label="Tab Tracker settings" hidden>
 
+      <!-- Who's online, so a call doesn't require opening the whole app. -->
+      <div class="peers" id="peers" hidden>
+        <div class="peers-head">
+          <span>Teammates</span>
+          <span id="peers-status"></span>
+        </div>
+        <div id="peers-list"></div>
+      </div>
+
       <button class="row" type="button" id="open-stats">
         <span class="row-label">Open Tab Tracker</span>
       </button>
