@@ -14,11 +14,18 @@ only feature that requires a server, and it's opt-in.
 3. Click **Load unpacked** and pick this folder.
 4. Pin the Tab Tracker icon to your toolbar.
 
-To build a Chrome Web Store zip instead:
+Or install it from **[tabtracker.uthman.xyz](https://tabtracker.uthman.xyz)**.
+
+To build a Chrome Web Store zip:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File build_zip.ps1
 ```
+
+Everything needed to submit it — listing copy, permission justifications, and
+screenshots — is in [`store/`](store/). The screenshots are generated from the
+real UI rather than mocked up, so re-running the generator after a change keeps
+them honest.
 
 ## What it does
 
@@ -123,15 +130,22 @@ every outbound request and why it happens.
 ## Desktop app
 
 A companion floating pill that tracks time per *application* — across your whole
-computer, not just the browser — lives in [`desktop/`](desktop/). When both are
-running, the extension sends the current site to it over loopback so the pill can
-show `Google Chrome · github.com`.
+computer, not just the browser — lives in [`desktop/`](desktop/). It runs on
+**Windows and macOS**, and adds a stats window, prayer alerts that fire whether
+or not the browser is open, and voice calls that ring on the pill.
+
+When both are running the extension sends the current site over loopback, so the
+pill can show `Google Chrome · github.com`. The desktop app takes priority for
+anything both halves implement — prayer alerts and voice presence — so a prayer
+is never announced twice and you never appear on the roster twice. Close the app
+and the browser picks both duties back up.
 
 ## Repository layout
 
 | Folder | What it is |
 |---|---|
 | _(root)_ | The Chrome/Edge extension |
-| [`desktop/`](desktop/) | Electron app — the floating pill |
+| [`desktop/`](desktop/) | Electron app — the floating pill (Windows and macOS) |
 | [`worker/`](worker/) | Cloudflare Worker — voice rendezvous |
 | [`site/`](site/) | The landing page |
+| [`store/`](store/) | Chrome Web Store listing copy and generated screenshots |
