@@ -512,6 +512,9 @@ function showAlert(payload) {
 
   const isVerse = payload.kind === 'prayer-verse';
   const verse = payload.verse || null;
+  // Lets the stylesheet tell the two cards apart: on a verse card the name is
+  // the source and steps back; on a prayer card it is the headline.
+  alertEls.root.classList.toggle('verse', isVerse);
 
   alertEls.name.textContent = isVerse
     ? (verse && verse.surahName ? verse.surahName : 'Reflection')

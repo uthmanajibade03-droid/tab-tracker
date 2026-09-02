@@ -433,6 +433,19 @@ function renderPrayer(s) {
     : 'off';
 }
 
+/**
+ * "19:25" -> "7:25 PM". Returns the input untouched if it is not a time, so a
+ * blank or an error string from the API passes through rather than becoming
+ * "NaN:undefined".
+ */
+function clockTime(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || ''));
+  if (!m) return String(hhmm || '');
+  const h24 = Number(m[1]);
+  const suffix = h24 < 12 ? 'AM' : 'PM';
+  return `${h24 % 12 || 12}:${m[2]} ${suffix}`;
+}
+
 /** Today's five times, with the next one marked. */
 async function renderTimes() {
   const t = await window.stats.prayerTimes();
@@ -458,7 +471,7 @@ async function renderTimes() {
     n.textContent = name;
     const v = document.createElement('div');
     v.className = 't';
-    v.textContent = hhmm;
+    v.textContent = clockTime(hhmm);
     cell.append(n, v);
     P.times.appendChild(cell);
   }

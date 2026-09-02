@@ -36,6 +36,15 @@ body {
   /* Product accent. Used only for the dot and focus rings. */
   --accent: #209C64;
   --accent-light: #4DDB9B;
+
+  /* One glass recipe, shared by the pill, the panel and the alert so the three
+     read as the same material. The fill stays semi-opaque on purpose: see the
+     note in patch-glass.js about backdrop-filter in a transparent window. */
+  --surface: linear-gradient(168deg, rgba(255,255,255,.085), rgba(255,255,255,.022) 48%, rgba(255,255,255,.050)),
+             rgba(16,17,20,.78);
+  --edge-top: rgba(255,255,255,.42);
+  --edge-mid: rgba(255,255,255,.055);
+  --radius: calc(16px * var(--scale));
 }
 
 html, body {
@@ -92,15 +101,17 @@ body.panel-up .panel { order: 1; }
   gap: var(--gap);
   padding: 0 var(--pad-x);
 
-  border-radius: 999px;
-  background: rgba(20, 22, 26, 0.82);
-  /* Two layered shadows: a soft ambient drop shadow for lift, and an inset
-     hairline that reads as a light catching the top edge of the glass. */
+  border-radius: var(--radius);
+  background: var(--surface);
+  /* Ambient lift, a contact shadow so it sits on the screen rather than
+     hovering above it, and the lit top edge. The perimeter hairline is a
+     gradient and lives in ::before — a flat inset ring reads as a stroked
+     rectangle, not as light on an edge. */
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.38),
-    0 1px 2px rgba(0, 0, 0, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(14px) saturate(140%);
+    0 12px 30px -8px rgba(0, 0, 0, 0.52),
+    0 2px 5px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(18px) saturate(108%);
 
   font-size: var(--fs);
   line-height: 1;
@@ -115,6 +126,46 @@ body.panel-up .panel { order: 1; }
   -webkit-app-region: no-drag;
   cursor: default;
 }
+
+/*
+ * Perimeter light and grain. Both are absolutely positioned so they take no
+ * part in the flex layout, and both are pointer-transparent so the grip and
+ * the pill's own click handling are untouched.
+ */
+.pill::before,
+.panel::before,
+.alert::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(148deg,
+    var(--edge-top), rgba(255,255,255,.11) 32%, var(--edge-mid) 60%, rgba(255,255,255,.20));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pill::after,
+.panel::after,
+.alert::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 4;
+  opacity: .26;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
+}
+
+/* Children need to clear the two surface layers. */
+.pill > *, .panel > *, .alert > * { position: relative; z-index: 2; }
 
 .pill:focus { outline: none; }
 .pill:focus-visible {
@@ -173,12 +224,10 @@ body.resizing .grip { opacity: 1; }
 
 .dot.active {
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(32, 156, 100, 0.65);
 }
 
 .dot.paused {
-  background: #fbbf24;
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+  background: #E0A33C;
 }
 
 .dot.idle {
@@ -262,6 +311,7 @@ body.resizing .grip { opacity: 1; }
 .alert[hidden] { display: none; }
 
 .alert {
+  position: relative;                 /* anchors the ::before / ::after layers */
   order: 2;
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -274,14 +324,17 @@ body.resizing .grip { opacity: 1; }
   gap: 8px;
   text-align: center;
 
-  border-radius: calc(14px * var(--scale));
-  background: rgba(18, 26, 22, 0.95);
+  border-radius: var(--radius);
+  /* Neutral, not accent-tinted: a prayer notice framed in the product green
+     read as branding rather than as a moment. */
+  background: linear-gradient(168deg, rgba(255,255,255,.075), rgba(255,255,255,.018) 48%, rgba(255,255,255,.042)),
+              rgba(15,16,19,.95);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.46),
-    0 1px 2px rgba(0, 0, 0, 0.30),
-    inset 0 0 0 1px rgba(77, 219, 155, 0.22);
-  backdrop-filter: blur(18px) saturate(140%);
-  color: rgba(255, 255, 255, 0.9);
+    0 18px 44px -10px rgba(0, 0, 0, 0.60),
+    0 2px 5px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(20px) saturate(108%);
+  color: rgba(255, 255, 255, 0.92);
 
   -webkit-app-region: no-drag;
 
@@ -303,11 +356,23 @@ body.alert-open .alert {
   transform: none;
 }
 
+/* The prayer card's headline. */
 .alert-name {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: #7fe8b8;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.004em;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+/* On the verse card the same element names the source, so it steps back into
+   a label and lets the Arabic carry the card. */
+.alert.verse .alert-name {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* Mushaf-style faces when present, then anything with real Arabic coverage. */
@@ -325,16 +390,18 @@ body.alert-open .alert {
 .alert-english {
   margin: 0;
   font-size: 12.5px;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.82);
+  font-weight: 300;
+  line-height: 1.58;
+  color: rgba(255, 255, 255, 0.72);
   max-width: 52ch;
 }
 
 .alert-ref {
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(127, 232, 184, 0.75);
+  color: rgba(255, 255, 255, 0.34);
 }
 
 .alert-actions {
@@ -415,10 +482,13 @@ body.alert-open .alert {
 }
 
 /* The pill itself takes on the alert's tint while one is showing. */
+/* The capsule brightens slightly while a card is open, so the two read as one
+   object — but in light, not in brand colour. */
 body.alert-open .pill {
   box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.42),
-    inset 0 0 0 1px rgba(77, 219, 155, 0.35);
+    0 12px 30px -8px rgba(0, 0, 0, 0.52),
+    0 2px 5px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -549,6 +619,7 @@ body.in-call .dot { background: #4DDB9B !important; }
 .panel[hidden] { display: none; }
 
 .panel {
+  position: relative;                 /* anchors the ::before / ::after layers */
   flex: 0 0 auto;
   box-sizing: border-box;
   margin: 0 var(--inset-x) var(--inset-y);
@@ -558,13 +629,15 @@ body.in-call .dot { background: #4DDB9B !important; }
   flex-direction: column;
   gap: 2px;
 
-  border-radius: calc(14px * var(--scale));
-  background: rgba(20, 22, 26, 0.94);
+  border-radius: var(--radius);
+  /* Denser than the pill: a menu has to beat whatever it is covering. */
+  background: linear-gradient(168deg, rgba(255,255,255,.075), rgba(255,255,255,.018) 48%, rgba(255,255,255,.042)),
+              rgba(16,17,20,.93);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.46),
-    0 1px 2px rgba(0, 0, 0, 0.30),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(18px) saturate(140%);
+    0 18px 40px -10px rgba(0, 0, 0, 0.58),
+    0 2px 5px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(20px) saturate(108%);
 
   font-size: var(--fs-panel);
   line-height: 1.2;

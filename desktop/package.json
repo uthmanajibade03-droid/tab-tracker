@@ -1,6 +1,6 @@
 {
   "name": "tab-tracker-desktop",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
   "author": "Uthman Ajibade",
@@ -43,7 +43,13 @@
     ],
     "mac": {
       "target": [
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
@@ -58,7 +64,9 @@
       {
         "from": "../icons",
         "to": "icons",
-        "filter": ["*.png"]
+        "filter": [
+          "*.png"
+        ]
       }
     ],
     "win": {
