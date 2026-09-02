@@ -10,7 +10,7 @@
     alone does not reliably match sibling files.
   -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; media-src https:;" />
+        content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; media-src 'self' file: https:;" />
   <title>Tab Tracker</title>
   <link rel="stylesheet" href="pill.css" />
 </head>
@@ -27,15 +27,20 @@
          role="button" tabindex="0"
          aria-haspopup="dialog" aria-expanded="false" aria-controls="panel"
          aria-label="Tab Tracker — open settings">
-      <span class="dot" id="dot" aria-hidden="true"></span>
-
-      <!-- Cross-faded as a unit whenever the focused app changes. -->
+      <!--
+        Two rows. The label says what the number is and what the tracker is
+        doing; the line under it says what you are actually in. Cross-faded as
+        a unit whenever the focused app changes.
+      -->
       <div class="content" id="content">
-        <span class="app" id="app">Waiting…</span>
-        <span class="sep" id="domain-sep" hidden>·</span>
-        <span class="domain" id="domain" hidden></span>
-        <span class="sep">·</span>
-        <span class="time" id="time">0m 00s</span>
+        <div class="meta">
+          <span class="tag" id="tag">Waiting</span>
+          <span class="time" id="time">0m 00s</span>
+        </div>
+        <div class="headline">
+          <span class="app" id="app">Waiting…</span>
+          <span class="domain" id="domain" hidden></span>
+        </div>
       </div>
 
       <!-- Grab the right edge to resize. Exposed as a slider so it is also
@@ -91,6 +96,8 @@
     <!-- Prayer alert. Shares the panel's slot below the pill, but is driven by
          a timer rather than by the user, so it lives outside #panel. -->
     <div class="alert" id="alert" role="status" aria-live="polite" hidden>
+      <!-- Only shown on the verse card; the prayer-name card stays plain. -->
+      <video class="alert-scene" id="alert-scene"></video>
       <div class="alert-name" id="alert-name"></div>
       <p class="alert-arabic" id="alert-arabic" hidden></p>
       <p class="alert-english" id="alert-english" hidden></p>
@@ -105,6 +112,7 @@
 
   <audio id="alert-audio" preload="none"></audio>
 
+  <script src="scene.js"></script>
   <script src="pill.js"></script>
 </body>
 </html>

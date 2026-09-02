@@ -69,7 +69,7 @@ async function renderTodos() {
       ? `<span class="pill s" title="Shared">S</span>`
       : `<span class="pill p" title="Personal">P</span>`;
     const meta = t.createdByName && t.kind === 'shared'
-      ? ` <span class="by">by ${escapeHtml(t.createdByName)}</span>` : '';
+      ? ` <span style="color:#aaa;font-size:10px">by ${escapeHtml(t.createdByName)}</span>` : '';
     const klass = t.completed ? 'item done' : 'item';
     return `
       <div class="${klass}" data-id="${escapeHtml(t.id)}" data-kind="${t.kind}">

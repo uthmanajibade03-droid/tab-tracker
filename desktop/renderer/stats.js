@@ -549,3 +549,35 @@ setInterval(() => {
 }, 1000);
 
 refresh();
+
+/* ───────── ambient scene ──────────────────────────────────────────────
+ * A render of one place going from morning to night, held on the frame that
+ * matches the clock. Sunrise and sunset come from the prayer timings the app
+ * already fetches for the user's coordinates, so it tracks their actual sky
+ * rather than a latitude guessed here.
+ */
+let sceneHandle = null;
+
+async function initScene() {
+  const el = document.getElementById('scene');
+  const pick = document.getElementById('scene-pick');
+  if (!el || !pick || !window.Scene) return;
+
+  const ctx = await window.stats.sceneContext();
+  sceneHandle = window.Scene.attach(el, { sceneId: ctx.id, timings: ctx.timings });
+
+  for (const sc of window.Scene.SCENES) {
+    const o = document.createElement('option');
+    o.value = sc.id;
+    o.textContent = sc.name;
+    pick.appendChild(o);
+  }
+  pick.value = sceneHandle.sceneId;
+
+  pick.addEventListener('change', () => {
+    sceneHandle.setScene(pick.value);
+    window.stats.setScene(pick.value);
+  });
+}
+
+initScene();

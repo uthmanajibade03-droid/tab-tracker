@@ -70,12 +70,12 @@ if (WATCHER_STALE_MS < WATCHER_HEARTBEAT_MS * 2) {
  * numbers from the same formula — see --scale there.
  */
 const PILL_BASE_WIDTH = 260;
-const PILL_ASPECT = 52 / 260;
+const PILL_ASPECT = 76 / 260;   // two rows; must match ASPECT in renderer/pill.js
 // 200 rather than a rounder 190: Windows will not give a top-level window a
 // height below ~39px, so anything narrower would leave the capsule floating
 // inside a window taller than itself.
-const PILL_MIN_WIDTH = 200;  // 40px tall
-const PILL_MAX_WIDTH = 400;  // 80px tall; beyond this it stops reading as a HUD
+const PILL_MIN_WIDTH = 200;  // 58px tall
+const PILL_MAX_WIDTH = 400;  // 117px tall; beyond this it stops reading as a HUD
 
 function pillHeightFor(width) {
   // Must match the identical expression in pill.js, or the capsule and the
@@ -347,7 +347,7 @@ function activeMsFor(appName) {
 // UI state store (ui-state.json) — position, size, opacity, paused
 // ---------------------------------------------------------------------------
 
-const DEFAULT_UI_STATE = { x: null, y: null, width: PILL_BASE_WIDTH, paused: false };
+const DEFAULT_UI_STATE = { x: null, y: null, width: PILL_BASE_WIDTH, paused: false, scene: 'lake' };
 
 /** @type {{x: number|null, y: number|null, width: number, paused: boolean}} */
 let uiState = { ...DEFAULT_UI_STATE };
@@ -375,6 +375,7 @@ function loadUiState() {
     y: Number.isFinite(saved.y) ? Math.round(saved.y) : null,
     width: Number.isFinite(saved.width) ? clampWidth(saved.width) : PILL_BASE_WIDTH,
     paused: saved.paused === true,
+    scene: typeof saved.scene === 'string' ? saved.scene : DEFAULT_UI_STATE.scene,
   };
 }
 
@@ -1426,6 +1427,29 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('prayer:save', (_e, s) => prayer.setSettings(s));
   ipcMain.handle('prayer:preview-verse', () => prayer.previewVerse());
   ipcMain.handle('prayer:times', () => prayer.getTimings());
+
+  // -- ambient scene ---------------------------------------------------------
+  /*
+   * The renderer needs two things to place a scene: which one, and where the
+   * sun is. The second comes from the prayer timings the app already fetches
+   * for the user's coordinates — real sunrise and sunset for their location
+   * rather than a latitude guessed in the renderer.
+   */
+  ipcMain.handle('scene:get', async () => {
+    let timings = null;
+    try { const t = await prayer.getTimings(); timings = (t && t.timings) || null; } catch { /* fall back */ }
+    return { id: uiState.scene, timings };
+  });
+
+  ipcMain.handle('scene:set', (event, id) => {
+    if (typeof id !== 'string' || !/^[a-z]{2,12}$/.test(id)) return { ok: false };
+    uiState.scene = id;
+    saveUiState({ immediate: true });
+    // Tell the pill, so its verse card is not on a different scene from the
+    // window the choice was made in.
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('scene:changed', id);
+    return { ok: true, id };
+  });
   ipcMain.on('prayer:demo', () => prayer.runDemo());
 
   ipcMain.handle('voice:snapshot', () => voice.snapshot());

@@ -17,10 +17,9 @@ const els = {
   pill: document.getElementById('pill'),
   grip: document.getElementById('grip'),
   content: document.getElementById('content'),
-  dot: document.getElementById('dot'),
+  tag: document.getElementById('tag'),
   app: document.getElementById('app'),
   domain: document.getElementById('domain'),
-  domainSep: document.getElementById('domain-sep'),
   time: document.getElementById('time'),
 
   panel: document.getElementById('panel'),
@@ -43,7 +42,7 @@ const DRAG_THRESHOLD_PX = 3;
 // width independently, and a mismatch would leave the capsule not quite
 // filling the window it lives in.
 const BASE_WIDTH = 260;
-const ASPECT = 52 / 260;
+const ASPECT = 76 / 260;   // two rows; must match PILL_ASPECT in main.js
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 const KEY_STEP_PX = 10;
@@ -110,21 +109,28 @@ function paint(state) {
   const hasDomain = Boolean(state.domain);
   els.domain.textContent = hasDomain ? state.domain : '';
   els.domain.hidden = !hasDomain;
-  els.domainSep.hidden = !hasDomain;
 
   els.time.textContent = formatDuration(state.activeMs);
 }
 
-function paintDot(status) {
-  // The dot reflects tracking state, not identity, so it never cross-fades —
-  // it has its own colour transition and should react immediately.
-  els.dot.classList.remove('active', 'paused', 'idle');
-  els.dot.classList.add(status === 'active' || status === 'paused' ? status : 'idle');
+/*
+ * Tracking state, in words. This replaces the coloured dot: the label row was
+ * already there to say what the number is, and it can say what the tracker is
+ * doing at the same time without a legend.
+ *
+ * Not part of the cross-fade — state should change the instant it changes,
+ * while the fade is about identity.
+ */
+const TAG = { active: 'In focus', paused: 'Paused', idle: 'Idle' };
+
+function paintStatus(status) {
+  els.tag.textContent = TAG[status] || TAG.idle;
+  els.tag.dataset.status = status === 'active' || status === 'paused' ? status : 'idle';
 }
 
 function applyState(state) {
   latest = state;
-  paintDot(state.status);
+  paintStatus(state.status);
 
   const identity = identityOf(state);
 
@@ -501,6 +507,26 @@ function closeAlert() {
   }, 200);
 }
 
+/*
+ * The scene is attached lazily and kept: the first verse of the day pays for
+ * the decode, every later one reuses it. Which scene comes from the stats
+ * window's picker, so the two surfaces never disagree.
+ */
+let alertScene = null;
+
+function mountAlertScene() {
+  if (alertScene || !window.Scene) return;
+  const el = document.getElementById('alert-scene');
+  if (!el) return;
+  window.tracker.sceneContext().then(ctx => {
+    alertScene = window.Scene.attach(el, { sceneId: ctx.id, timings: ctx.timings });
+  }).catch(() => { /* no scene rather than a broken card */ });
+}
+
+if (window.tracker.onSceneChanged) {
+  window.tracker.onSceneChanged(id => { if (alertScene) alertScene.setScene(id); });
+}
+
 function showAlert(payload) {
   if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
   ringingPeerId = null;
@@ -515,6 +541,7 @@ function showAlert(payload) {
   // Lets the stylesheet tell the two cards apart: on a verse card the name is
   // the source and steps back; on a prayer card it is the headline.
   alertEls.root.classList.toggle('verse', isVerse);
+  if (isVerse) mountAlertScene();
 
   alertEls.name.textContent = isVerse
     ? (verse && verse.surahName ? verse.surahName : 'Reflection')

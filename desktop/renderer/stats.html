@@ -2,11 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; font-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; font-src 'self'; media-src 'self' file:">
 <title>Tab Tracker</title>
 <link rel="stylesheet" href="stats.css">
 </head>
 <body>
+
+<!-- Behind everything. Never played, only seeked: see scene.js. -->
+<video class="scene" id="scene"></video>
+<div class="scene-veil"></div>
 
 <header class="bar">
   <h1>Tab Tracker</h1>
@@ -156,6 +160,10 @@
 <footer class="foot">
   <button type="button" id="open-folder">Open data folder</button>
   <span id="foot-note"></span>
+  <label class="scene-pick">
+    <span class="sr-only">Ambient scene</span>
+    <select id="scene-pick"></select>
+  </label>
   <span class="foot-right">
     <span id="update-line"></span>
     <button type="button" id="update-install" hidden>Restart to update</button>
@@ -163,6 +171,7 @@
   </span>
 </footer>
 
+<script src="scene.js"></script>
 <script src="stats.js"></script>
 </body>
 </html>

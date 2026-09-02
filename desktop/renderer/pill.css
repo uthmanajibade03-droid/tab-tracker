@@ -97,9 +97,9 @@ body.panel-up .panel { order: 1; }
   box-sizing: border-box;
 
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--gap);
-  padding: 0 var(--pad-x);
+  padding: calc(10px * var(--scale)) var(--pad-x);
 
   border-radius: var(--radius);
   background: var(--surface);
@@ -239,8 +239,9 @@ body.resizing .grip { opacity: 1; }
 
 .content {
   display: flex;
-  align-items: baseline;
-  gap: calc(var(--gap) * 0.7);
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(5px * var(--scale));
   min-width: 0; /* lets .app actually shrink so its ellipsis can trigger */
   flex: 1 1 auto;
 
@@ -256,9 +257,37 @@ body.resizing .grip { opacity: 1; }
   transform: translateY(-3px);
 }
 
+/* Label row: what the tracker is doing, and what the number means. */
+.meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(12px * var(--scale));
+  min-width: 0;
+}
+
+.tag {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: calc(9px * var(--scale));
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.44);
+  white-space: nowrap;
+  transition: color 220ms ease;
+}
+/* Paused is the one state worth colouring: it means the number has stopped. */
+.tag[data-status="paused"] { color: #E0A33C; }
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: calc(7px * var(--scale));
+  min-width: 0;
+}
+
 .app {
-  font-weight: 600;
-  letter-spacing: 0.1px;
+  font-weight: 400;
+  letter-spacing: -0.008em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -266,8 +295,9 @@ body.resizing .grip { opacity: 1; }
 }
 
 .domain {
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.62);
+  font-weight: 300;
+  letter-spacing: -0.008em;
+  color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -276,14 +306,8 @@ body.resizing .grip { opacity: 1; }
   min-width: 0;
 }
 
-.sep {
-  flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.30);
-}
-
 .time {
   flex: 0 0 auto;
-  margin-left: auto;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
@@ -354,6 +378,37 @@ body.panel-up .alert {
 body.alert-open .alert {
   opacity: 1;
   transform: none;
+}
+
+/*
+ * The scene behind a verse. Sits under the text inside the card, above the
+ * card's own fill, and only while the card is the verse variant — a landscape
+ * behind "Maghrib · it is time for prayer" would be noise, but behind a verse
+ * you are meant to sit with for twenty-five seconds it is the point.
+ */
+.alert-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 600ms ease;
+  pointer-events: none;
+}
+.alert.verse .alert-scene { opacity: 1; }
+/* Everything the card paints has to clear it. */
+.alert > *:not(.alert-scene) { position: relative; z-index: 2; }
+/* Over a picture the card needs its own floor, or a bright frame washes the
+   Arabic out. */
+.alert.verse::after {
+  background-image: none;
+  background: linear-gradient(rgba(10,11,12,.52), rgba(10,11,12,.68));
+  mix-blend-mode: normal;
+  opacity: 1;
+  z-index: 1;
 }
 
 /* The prayer card's headline. */

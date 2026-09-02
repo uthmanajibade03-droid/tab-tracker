@@ -41,6 +41,12 @@ function subscribe(channel, callback) {
 }
 
 contextBridge.exposeInMainWorld('tracker', {
+  /** Which ambient scene to show behind the verse card, and where the sun is. */
+  sceneContext() { return ipcRenderer.invoke('scene:get'); },
+
+  /** Fired when the stats window changes the scene. */
+  onSceneChanged(callback) { return subscribe('scene:changed', callback); },
+
   // ---- pushes from the main process ----
 
   /**
@@ -152,6 +158,12 @@ contextBridge.exposeInMainWorld('tracker', {
  * the stats window has no business dragging or resizing the pill.
  */
 contextBridge.exposeInMainWorld('stats', {
+  /** Which ambient scene to show, and where the sun is. */
+  sceneContext() { return ipcRenderer.invoke('scene:get'); },
+
+  /** Change it. Persists, and tells the pill. */
+  setScene(id) { return ipcRenderer.invoke('scene:set', id); },
+
   /** Full payload: day list, per-app totals, per-site totals. */
   load() { return ipcRenderer.invoke('stats:load'); },
 

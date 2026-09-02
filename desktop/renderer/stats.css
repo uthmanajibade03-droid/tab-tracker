@@ -10,37 +10,48 @@
  * in one theme.
  */
 
+/*
+ * One palette, dark. The window is opened from a dark capsule and shares its
+ * material; a light document here would read as a different application.
+ */
 :root {
-  --bg: #ffffff;
-  --surface: #fbfbfa;
-  --line: #e8e9e8;
-  --ink: #141715;
-  --ink-2: #5b625e;
-  --ink-3: #858b87;
-  /* Validated for a light chart surface: OKLCH L 0.60, contrast >= 3:1. */
-  --accent: #209C64;
-  --track: #eef0ef;
+  --bg: #121412;
+  --surface: #1a1d1b;
+  --line: #292d2a;
+  --ink: #ECEEED;
+  --ink-2: rgba(236, 238, 237, 0.62);
+  --ink-3: rgba(236, 238, 237, 0.38);
+  /* Stepped down from the brand green, which sits at OKLCH L 0.80 on a dark
+     surface — outside the 0.48–0.67 band. This one is inside it. */
+  --accent: #26AC74;
+  --track: #242825;
   --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141614;
-    --surface: #1b1e1c;
-    --line: #2a2e2b;
-    --ink: #eceeed;
-    --ink-2: #9aa19d;
-    --ink-3: #6f7773;
-    /* Stepped down from the light accent: the brand green sits at L 0.80 on a
-       dark surface, outside the 0.48–0.67 band. This one is inside it. */
-    --accent: #26AC74;
-    --track: #242825;
-  }
 }
 
 * { box-sizing: border-box; }
 
 html, body { height: 100%; }
+
+/* The scene sits under the whole document; the veil keeps text legible over a
+   bright noon frame without hiding the picture. */
+.scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+}
+.scene-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(rgba(9,11,10,.34), rgba(9,11,10,.52));
+  backdrop-filter: saturate(94%);
+}
+body > header, body > main, body > footer { position: relative; z-index: 2; }
 
 body {
   margin: 0;
@@ -70,14 +81,15 @@ body {
   gap: 16px;
   padding: 14px 22px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: rgba(18,20,18,.72);
+  backdrop-filter: blur(20px) saturate(105%);
 }
 
 .bar h1 {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 400;
+  letter-spacing: -0.012em;
 }
 
 .bar-right {
@@ -88,15 +100,12 @@ body {
 }
 
 .paused-flag {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #b0740a;
-}
-
-@media (prefers-color-scheme: dark) {
-  .paused-flag { color: #e0a33c; }
+  color: #E0A33C;
 }
 
 select {
@@ -105,13 +114,19 @@ select {
   color: var(--ink);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 5px 9px;
+  border-radius: 7px;
+  padding: 6px 10px;
+  transition: color 160ms, border-color 160ms;
 }
+select:hover { color: var(--ink); border-color: var(--ink-3); }
 
+/* A hairline in ink. The accent is for things you act on, not for saying
+   where the caret is. */
 select:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--accent);
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 1px solid var(--ink-2);
   outline-offset: 2px;
 }
 
@@ -136,10 +151,11 @@ main {
 
 .tile {
   min-width: 0;
-  background: var(--surface);
+  background: linear-gradient(168deg, rgba(255,255,255,.055), rgba(255,255,255,.018)), rgba(16,18,17,.62);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 14px 16px;
+  backdrop-filter: blur(18px) saturate(102%);
 }
 
 .tile-label {
@@ -316,9 +332,12 @@ main {
 
 .voice-setup summary {
   cursor: pointer;
-  font-size: 12px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: var(--ink-3);
-  padding: 6px 0;
+  padding: 7px 0;
 }
 
 .voice-setup summary:hover { color: var(--ink-2); }
@@ -327,9 +346,10 @@ main {
 
 .field label {
   display: block;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-3);
   margin-bottom: 4px;
@@ -347,11 +367,6 @@ main {
   color: var(--ink);
 }
 
-.field input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .field-actions {
   display: flex;
   align-items: center;
@@ -361,9 +376,9 @@ main {
 
 .field-actions button {
   font: inherit;
-  font-size: 13px;
-  padding: 7px 16px;
-  border-radius: 6px;
+  font-size: 12.5px;
+  padding: 8px 17px;
+  border-radius: 7px;
   border: 1px solid var(--accent);
   background: var(--accent);
   color: #fff;
@@ -372,7 +387,10 @@ main {
 
 .field-actions button:hover { filter: brightness(1.08); }
 
-#v-saved { font-size: 12px; color: var(--ink-3); }
+#v-saved, #p-saved {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--ink-3);
+}
 
 /* ---------- prayer ---------- */
 
@@ -392,26 +410,30 @@ main {
   border-radius: 8px;
 }
 
+/* The next prayer is marked in ink, not with a tinted panel. */
 .time-cell.next {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: var(--ink-3);
+  background: var(--surface);
 }
 
 .time-cell .n {
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 
 .time-cell .t {
-  margin-top: 3px;
-  font-size: 16px;
-  font-weight: 600;
+  margin-top: 5px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
-.time-cell.next .t { color: var(--accent); }
+.time-cell.next .t { color: var(--ink); }
 
 .check {
   display: flex;
@@ -420,6 +442,7 @@ main {
   font-size: 13px;
   margin-bottom: 14px;
   cursor: pointer;
+  accent-color: var(--accent);
 }
 
 .ref-row,
@@ -436,11 +459,11 @@ main {
 .ref-row input,
 .timing-row input {
   width: 68px;
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 9px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--bg);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -448,11 +471,13 @@ main {
 
 .ref-sep, .ref-max { color: var(--ink-3); font-size: 12px; }
 
+/* Neutral. Quoting scripture inside the product accent made it read as a
+   promotional callout rather than as the verse. Matches the pill's card. */
 .verse-preview {
-  margin: 12px 0 0;
-  padding: 12px 14px;
-  border-left: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
   border-radius: 0 8px 8px 0;
 }
 
@@ -467,17 +492,19 @@ main {
 
 .verse-preview .en {
   display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  line-height: 1.55;
+  margin-top: 9px;
+  font-size: 12.5px;
+  font-weight: 300;
+  line-height: 1.6;
   color: var(--ink-2);
 }
 
 .verse-preview .rf {
   display: block;
-  margin-top: 6px;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  margin-top: 9px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -507,7 +534,8 @@ main {
   gap: 12px;
   padding: 10px 22px;
   border-top: 1px solid var(--line);
-  background: var(--surface);
+  background: rgba(18,20,18,.72);
+  backdrop-filter: blur(20px) saturate(105%);
   font-size: 12px;
   color: var(--ink-3);
 }
@@ -518,14 +546,23 @@ main {
   color: var(--ink-2);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 5px 10px;
+  border-radius: 7px;
+  padding: 6px 11px;
   cursor: pointer;
+  transition: color 160ms, border-color 160ms;
 }
 
 .foot button:hover {
   color: var(--ink);
   border-color: var(--ink-3);
+}
+
+.scene-pick select {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 5px 8px;
 }
 
 .foot-right {
@@ -538,6 +575,9 @@ main {
 /* The version is the answer to "what am I running?" — always present, never
    loud. It earns its place by being checkable, not by being noticed. */
 .version {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
