@@ -348,25 +348,77 @@
               /Mac OS X/.test(navigator.userAgent || '');
   if (!isMac) return;
 
-  var REL = 'https://github.com/uthmanajibade03-droid/tab-tracker/releases/latest/download/';
+  var REPO = 'uthmanajibade03-droid/tab-tracker';
+  var REL = 'https://github.com/' + REPO + '/releases/latest/download/';
   var btn = document.querySelector('.card .btn');
   var note = document.getElementById('dl-note');
   if (!btn || !note) return;
 
-  btn.textContent = 'Download for Mac · Apple Silicon';
-  btn.setAttribute('href', REL + 'TabTracker-mac-arm64.zip');
+  /*
+   * Ask the release what it actually contains before offering anything.
+   *
+   * A Mac build only exists once someone has run it on a Mac and uploaded the
+   * result, so the page cannot assume. Hard-coding the links produced a button
+   * that looked ready and returned 404 — worse than saying nothing, because it
+   * wastes a click and reads as a broken site rather than an unfinished
+   * platform. Asking means the button appears by itself the moment the files
+   * are uploaded, with no redeploy.
+   */
+  function unavailable(reason) {
+    btn.textContent = 'Windows only for now';
+    btn.removeAttribute('href');
+    btn.setAttribute('aria-disabled', 'true');
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--muted)';
+    btn.style.boxShadow = 'inset 0 0 0 1px var(--line)';
+    note.textContent = reason;
+  }
 
-  var alt = document.createElement('a');
-  alt.className = 'btn-alt';
-  alt.href = REL + 'TabTracker-mac-x64.zip';
-  alt.textContent = 'Intel Mac';
-  btn.insertAdjacentElement('afterend', alt);
+  // Neutral while we find out — never a download link we have not confirmed.
+  btn.textContent = 'Checking for a Mac build…';
+  btn.removeAttribute('href');
 
-  note.innerHTML =
-    'Unzip it and drag <b>Tab Tracker</b> into Applications. ' +
-    'The first time you open it macOS will say it is damaged — it is not, ' +
-    'it just is not signed yet. <b>Right-click the app and choose Open</b>, ' +
-    'then click Open again. You only do this once.';
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest', {
+    headers: { Accept: 'application/vnd.github+json' },
+  })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error(r.status)); })
+    .then(function (rel) {
+      var names = (rel.assets || []).map(function (a) { return a.name; });
+      var hasArm = names.indexOf('TabTracker-mac-arm64.zip') !== -1;
+      var hasIntel = names.indexOf('TabTracker-mac-x64.zip') !== -1;
+      if (!hasArm && !hasIntel) {
+        unavailable("The desktop pill isn't built for macOS yet. The browser extension works there — grab that instead.");
+        return;
+      }
+
+      // Apple Silicon is the default; the browser cannot tell the two apart
+      // (navigator.platform says "MacIntel" on both), so offer, don't guess.
+      var primary = hasArm
+        ? { file: 'TabTracker-mac-arm64.zip', label: 'Download for Mac · Apple Silicon' }
+        : { file: 'TabTracker-mac-x64.zip', label: 'Download for Mac · Intel' };
+
+      btn.textContent = primary.label;
+      btn.setAttribute('href', REL + primary.file);
+
+      if (hasArm && hasIntel) {
+        var alt = document.createElement('a');
+        alt.className = 'btn-alt';
+        alt.href = REL + 'TabTracker-mac-x64.zip';
+        alt.textContent = 'Intel Mac';
+        btn.insertAdjacentElement('afterend', alt);
+      }
+
+      note.innerHTML =
+        'Unzip it and drag <b>Tab Tracker</b> into Applications. ' +
+        'The first time you open it macOS will say it is damaged — it is not, ' +
+        'it just is not signed yet. <b>Right-click the app and choose Open</b>, ' +
+        'then click Open again. You only do this once.';
+    })
+    .catch(function () {
+      // Rate-limited or offline. Say what is certainly true rather than
+      // offering a link that might 404.
+      unavailable('Download the Windows build from a PC, or use the browser extension — it works on macOS.');
+    });
 })();
 
 (function () {
