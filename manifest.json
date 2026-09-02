@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tab Tracker",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Track active time per site, share to-dos, prayer-time reminders, teammate voice calls, and per-site overuse alerts.",
   "permissions": ["tabs", "storage", "idle", "alarms", "contextMenus", "scripting", "offscreen"],
   "host_permissions": ["<all_urls>"],
