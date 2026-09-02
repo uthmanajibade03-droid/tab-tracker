@@ -194,6 +194,43 @@ main {
   padding: 16px 18px 18px;
 }
 
+/* Label and figure on one line, then the sentence, then a rule — the shape
+   every card in the design shares. */
+.head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.head-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lede {
+  margin: 7px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+/* Subject bright, qualifier dimmed, same size and face. */
+.lede-main { font-weight: 400; color: var(--ink); }
+.lede-sub  { font-weight: 300; color: var(--ink-2); }
+
+.rule {
+  height: 1px;
+  background: var(--line);
+  margin: 14px 0 4px;
+}
+
 .panel-head {
   display: flex;
   align-items: baseline;
@@ -241,6 +278,8 @@ main {
 }
 
 .row-name {
+  color: var(--ink-2);
+  font-weight: 300;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -258,15 +297,18 @@ main {
 
 .row-track {
   grid-column: 1 / -1;
-  height: 3px;
-  background: var(--track);
-  border-radius: 2px;
+  height: 1px;
+  background: rgba(236, 238, 237, 0.09);
   overflow: hidden;
 }
 
+/* The longest row is the one you are looking for; it gets the light. */
+.row:first-child .row-name { color: var(--ink); }
+.row:first-child .row-fill { background: rgba(236, 238, 237, 0.72); }
+
 .row-fill {
   height: 100%;
-  background: var(--accent);
+  background: rgba(236, 238, 237, 0.30);
   /* Rounded only on the data end; the baseline end stays square so bars all
      start from the same hard edge. */
   border-radius: 0 2px 2px 0;
@@ -396,41 +438,39 @@ main {
 
 /* Five times across a row: the whole point is comparing them at a glance,
    so they get equal columns and lining figures rather than a list. */
+/* A list, not a comparison grid: the question is "which is next", and the lit
+   row answers it without reading all five. */
 .times {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
 }
 
 .time-cell {
   min-width: 0;
-  text-align: center;
-  padding: 10px 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
 }
 
-/* The next prayer is marked in ink, not with a tinted panel. */
-.time-cell.next {
-  border-color: var(--ink-3);
-  background: var(--surface);
-}
+/* The next prayer is marked in ink — no border, no tinted panel. */
+.time-cell.next .n,
+.time-cell.next .t { color: var(--ink); }
 
 .time-cell .n {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: -0.005em;
+  color: var(--ink-2);
 }
 
 .time-cell .t {
-  margin-top: 5px;
   font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--ink-2);
+  font-size: 11px;
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .time-cell.next .t { color: var(--ink); }
@@ -521,9 +561,7 @@ main {
   filter: none;
 }
 
-@media (max-width: 640px) {
-  .times { grid-template-columns: repeat(2, 1fr); }
-}
+
 
 /* ---------- footer ---------- */
 

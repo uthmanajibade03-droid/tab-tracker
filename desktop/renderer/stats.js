@@ -13,7 +13,6 @@ const daySelect = document.getElementById('day');
 const pausedFlag = document.getElementById('paused-flag');
 const elTotal = document.getElementById('t-total');
 const elApps = document.getElementById('t-apps');
-const elTop = document.getElementById('t-top');
 const appsChart = document.getElementById('apps-chart');
 const appsEmpty = document.getElementById('apps-empty');
 const appsNote = document.getElementById('apps-note');
@@ -45,6 +44,19 @@ function fmtDay(key, today) {
   const yKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
   if (key === yKey) return 'Yesterday';
   return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/*
+ * A day total in hours and minutes. fmtDuration keeps seconds, which is right
+ * for the pill's live counter and wrong here — the seconds field is always 00
+ * by the time a day is worth reading.
+ */
+function fmtSpan(ms) {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h >= 1) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}m`;
 }
 
 /** {name, activeMs} rows, biggest first, zero-time entries dropped. */
@@ -88,7 +100,7 @@ function renderChart(container, rows, emptyEl, noteEl, limit = 12) {
 
     const value = document.createElement('div');
     value.className = 'row-value';
-    value.textContent = `${fmtDuration(r.activeMs)} · ${share.toFixed(1)}%`;
+    value.textContent = fmtSpan(r.activeMs);
 
     const track = document.createElement('div');
     track.className = 'row-track';
@@ -104,8 +116,8 @@ function renderChart(container, rows, emptyEl, noteEl, limit = 12) {
   // Never silently truncate — say what was left out.
   const hidden = rows.length - shown.length;
   noteEl.textContent = hidden > 0
-    ? `top ${shown.length} of ${rows.length}`
-    : `${rows.length} tracked`;
+    ? `top ${shown.length} by time`
+    : 'ranked by time';
 }
 
 function render() {
@@ -116,9 +128,9 @@ function render() {
 
   const totalMs = appRows.reduce((sum, r) => sum + r.activeMs, 0);
   elTotal.textContent = totalMs > 0 ? fmtDuration(totalMs) : '—';
-  elApps.textContent = appRows.length || '—';
-  elTop.textContent = appRows.length ? appRows[0].name : '—';
-  elTop.title = appRows.length ? appRows[0].name : '';
+  elApps.textContent = appRows.length
+    ? `${appRows.length} ${appRows.length === 1 ? 'app' : 'apps'}`
+    : 'Nothing yet';
 
   pausedFlag.hidden = !payload.paused;
 

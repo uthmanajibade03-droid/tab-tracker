@@ -142,6 +142,14 @@ todoListEl.addEventListener('click', async (e) => {
 });
 
 /* ───────── Stats tab ──────────────────────────────────────────────── */
+/** Hours and minutes; a day total has no use for seconds. */
+function fmtSpan(ms) {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h >= 1 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
+}
+
 async function renderStats() {
   const key = todayKey();
   document.getElementById('date').textContent = key;
@@ -151,25 +159,54 @@ async function renderStats() {
     .map(([domain, v]) => ({ domain, ...v }))
     .sort((a, b) => b.activeMs - a.activeMs);
 
-  const tbody = document.querySelector('#tbl tbody');
-  tbody.innerHTML = '';
+  const list = document.getElementById('site-list');
+  list.replaceChildren();
+  const empty = document.getElementById('empty');
+  const count = document.getElementById('site-count');
+
   if (rows.length === 0) {
-    document.getElementById('tbl').hidden = true;
-    document.getElementById('empty').hidden = false;
-    document.getElementById('totals').textContent = '';
-  } else {
-    document.getElementById('tbl').hidden = false;
-    document.getElementById('empty').hidden = true;
-    for (const r of rows.slice(0, 12)) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="domain" title="${escapeHtml(r.domain)}">${escapeHtml(r.domain)}</td><td class="num">${r.opens}</td><td class="num">${fmtTime(r.activeMs)}</td>`;
-      tbody.appendChild(tr);
-    }
-    const totalMs = rows.reduce((a, r) => a + r.activeMs, 0);
-    const totalOpens = rows.reduce((a, r) => a + r.opens, 0);
-    document.getElementById('totals').textContent =
-      `${rows.length} sites · ${totalOpens} visits · ${fmtTime(totalMs)} active`;
+    empty.hidden = false;
+    document.getElementById('totals').textContent = '—';
+    count.textContent = 'Nothing yet';
+    document.getElementById('date').textContent = '';
+    return;
   }
+
+  empty.hidden = true;
+  // Bars scale against the largest, not the total, so the top row always fills
+  // and the small ones stay visible.
+  const max = rows[0].activeMs || 1;
+  const shown = rows.slice(0, 12);
+  for (const r of shown) {
+    const row = document.createElement('div');
+    row.className = 'srow';
+    row.title = `${r.domain} — ${fmtTime(r.activeMs)}`;
+
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = r.domain;
+
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = fmtSpan(r.activeMs);
+
+    const bar = document.createElement('span');
+    bar.className = 'bar';
+    const fl = document.createElement('span');
+    fl.className = 'fl';
+    fl.style.width = `${Math.max(1, (r.activeMs / max) * 100)}%`;
+    bar.appendChild(fl);
+
+    row.append(n, t, bar);
+    list.appendChild(row);
+  }
+
+  const totalMs = rows.reduce((a, r) => a + r.activeMs, 0);
+  const totalOpens = rows.reduce((a, r) => a + (r.opens || 0), 0);
+  document.getElementById('totals').textContent = fmtSpan(totalMs);
+  count.textContent = `${rows.length} ${rows.length === 1 ? 'site' : 'sites'}`;
+  document.getElementById('date').textContent =
+    rows.length > shown.length ? `top ${shown.length} by time` : `${totalOpens} visits`;
 
   const { syncConfig, lastSyncAt, lastSyncStatus } = await chrome.storage.local.get([
     'syncConfig', 'lastSyncAt', 'lastSyncStatus'
