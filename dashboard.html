@@ -20,6 +20,13 @@
       --danger: #f2b8b5;
     }
   }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 1px solid var(--ink-2); outline-offset: 2px;
+  }
+  ::selection { background: var(--accent); color: #fff; }
   * { box-sizing: border-box; }
   body { font: 14px/1.5 var(--sans); margin: 0; background: var(--bg); color: var(--ink);
          -webkit-font-smoothing: antialiased; }
