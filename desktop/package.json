@@ -1,6 +1,6 @@
 {
   "name": "tab-tracker-desktop",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "description": "Always-on-top pill showing the focused desktop app and today's time in it.",
   "author": "Uthman Ajibade",

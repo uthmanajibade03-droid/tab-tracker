@@ -244,7 +244,7 @@ body.resizing .grip { opacity: 1; }
 .content {
   flex: 0 0 auto;
   min-height: calc(var(--pill-h) - 2 * var(--inset-y));
-  padding: calc(10px * var(--scale)) var(--pad-x);
+  padding: calc(8px * var(--scale)) var(--pad-x);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -636,21 +636,22 @@ body.alert-open .pill {
 .peers[hidden] { display: none; }
 
 .peers {
-  padding: 4px 8px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 2px;
+  padding: 10px var(--pad-x) 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  margin-top: 6px;
 }
 
 .peers-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
-  padding: 2px 0 6px;
+  color: rgba(255, 255, 255, 0.42);
+  padding: 0 0 7px;
 }
 
 .peer-row {

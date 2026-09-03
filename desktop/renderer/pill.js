@@ -579,6 +579,9 @@ if (window.tracker.onSceneChanged) {
 }
 
 function showAlert(payload) {
+  // The capsule holds one thing at a time. A prayer arriving outranks a list
+  // the user opened, so the panel gives up the surface.
+  if (panel.open) closePanel();
   if (alertTimer) { clearTimeout(alertTimer); alertTimer = null; }
   ringingPeerId = null;
   alertEls.root.classList.remove('calling');

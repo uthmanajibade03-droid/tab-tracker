@@ -328,6 +328,8 @@ async function runDemo() {
     prayer: name,
     seconds: 8,
     audioUrl: store.alert.adhanUrl || '',
+    // The preview should look like the real thing, times included.
+    timings: lastTimings || null,
     demo: true,
   });
   // Long enough to read the name card, short enough to not be a wait.
