@@ -1192,6 +1192,10 @@ function statsPayload() {
     apps: stats,
     sites: browserStats,
     paused: state.paused,
+    // The only figure on the window that moves: what you are in, right now.
+    now: state.appName
+      ? { app: state.appName, activeMs: activeMsFor(state.appName) }
+      : null,
   };
 }
 
@@ -1435,6 +1439,24 @@ if (!app.requestSingleInstanceLock()) {
    * for the user's coordinates — real sunrise and sunset for their location
    * rather than a latitude guessed in the renderer.
    */
+  /*
+   * A trimmed statsPayload for the pill: it only ever shows the top few, and
+   * shipping the whole day's map to a 320px panel would be wasteful.
+   */
+  ipcMain.handle('pill:today', () => {
+    tick();                                       // flush the in-memory tail first
+    const today = stats[todayKey()] || {};
+    const rows = Object.entries(today)
+      .map(([name, v]) => ({ name, activeMs: (v && v.activeMs) || 0 }))
+      .filter(r => r.activeMs > 0)
+      .sort((a, b) => b.activeMs - a.activeMs);
+    return {
+      totalMs: rows.reduce((sum, r) => sum + r.activeMs, 0),
+      count: rows.length,
+      top: rows.slice(0, 4),
+    };
+  });
+
   ipcMain.handle('scene:get', async () => {
     let timings = null;
     try { const t = await prayer.getTimings(); timings = (t && t.timings) || null; } catch { /* fall back */ }

@@ -48,8 +48,8 @@ html, body { height: 100%; }
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(rgba(9,11,10,.34), rgba(9,11,10,.52));
-  backdrop-filter: saturate(94%);
+  background: linear-gradient(rgba(9,11,10,.46), rgba(9,11,10,.62));
+  backdrop-filter: saturate(92%);
 }
 body > header, body > main, body > footer { position: relative; z-index: 2; }
 
@@ -81,8 +81,8 @@ body {
   gap: 16px;
   padding: 14px 22px;
   border-bottom: 1px solid var(--line);
-  background: rgba(18,20,18,.72);
-  backdrop-filter: blur(20px) saturate(105%);
+  background: rgba(16,18,16,.58);
+  backdrop-filter: blur(22px) saturate(102%);
 }
 
 .bar h1 {
@@ -97,6 +97,15 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.stamp {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
 
 .paused-flag {
@@ -149,14 +158,7 @@ main {
   gap: 12px;
 }
 
-.tile {
-  min-width: 0;
-  background: linear-gradient(168deg, rgba(255,255,255,.055), rgba(255,255,255,.018)), rgba(16,18,17,.62);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
-  backdrop-filter: blur(18px) saturate(102%);
-}
+
 
 .tile-label {
   font-family: var(--mono);
@@ -188,10 +190,49 @@ main {
 /* ---------- panels ---------- */
 
 .panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 16px 18px 18px;
+  /* No box. The window is the card; these are sections of it, separated by
+     space and a rule rather than by a border. */
+  padding: 4px 2px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.panel:last-of-type { border-bottom: none; }
+
+/* Three figures across the top of the card. No boxes: the labels separate
+   them, and a border around each would be three more rectangles competing
+   with the rows below. */
+.figures {
+  display: flex;
+  gap: 44px;
+  flex-wrap: wrap;
+}
+
+.figure { min-width: 0; }
+
+.figure-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.figure-value {
+  margin-top: 8px;
+  font-size: 27px;
+  font-weight: 300;
+  letter-spacing: -0.024em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The live one. The only moving figure on the page, and the only thing here
+   that takes the accent. */
+.figure-value.live {
+  font-family: var(--mono);
+  font-size: 25px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #C6923F;
 }
 
 /* Label and figure on one line, then the sentence, then a rule — the shape
@@ -224,6 +265,16 @@ main {
 /* Subject bright, qualifier dimmed, same size and face. */
 .lede-main { font-weight: 400; color: var(--ink); }
 .lede-sub  { font-weight: 300; color: var(--ink-2); }
+
+.more {
+  margin: 10px 0 0;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.more:empty { display: none; }
 
 .rule {
   height: 1px;

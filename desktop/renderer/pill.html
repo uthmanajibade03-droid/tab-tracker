@@ -43,6 +43,63 @@
         </div>
       </div>
 
+      <div class="panel" id="panel" role="dialog" aria-label="Today so far" hidden>
+
+        <!--
+          The card: a label with the figure, the headline, a rule, then the rows.
+          Settings are not here — they are in the pill's right-click menu and in
+          the tray, both of which already carry every one of them.
+        -->
+        <div class="card-head">
+          <span class="card-label">Today so far</span>
+          <span class="card-value" id="p-total">—</span>
+        </div>
+        <p class="card-lede">
+          <span class="lede-main" id="p-count">—</span>
+          <span class="lede-sub" id="p-note"></span>
+        </p>
+        <div class="card-rule"></div>
+        <div id="p-apps"></div>
+        <p class="card-empty" id="p-empty" hidden>Nothing tracked yet today.</p>
+
+
+        <!-- Who's online, so a call doesn't require opening the whole app. -->
+        <div class="peers" id="peers" hidden>
+          <div class="peers-head">
+            <span>Teammates</span>
+            <span id="peers-status"></span>
+          </div>
+          <div id="peers-list"></div>
+        </div>
+
+        <!-- Right-click the pill for tracking, reset, folder and quit. -->
+      </div>
+
+      <!-- Prayer alert. Shares the panel's slot below the pill, but is driven by
+           a timer rather than by the user, so it lives outside #panel. -->
+      <div class="alert" id="alert" role="status" aria-live="polite" hidden>
+        <!-- Only shown on the verse card; the prayer-name card stays plain. -->
+        <video class="alert-scene" id="alert-scene"></video>
+        <!-- Prayer card: label row, sentence, then the day's five. -->
+        <div class="alert-head" id="alert-head">
+          <span class="alert-tag" id="alert-name"></span>
+          <span class="alert-clock" id="alert-time"></span>
+        </div>
+        <p class="alert-lede" id="alert-lede">
+          <span class="lede-main" id="alert-lede-main"></span>
+          <span class="lede-sub" id="alert-lede-sub"></span>
+        </p>
+        <div class="alert-rule" id="alert-rule" hidden></div>
+        <div class="alert-times" id="alert-times" hidden></div>
+        <p class="alert-arabic" id="alert-arabic" hidden></p>
+        <p class="alert-english" id="alert-english" hidden></p>
+        <div class="alert-ref" id="alert-ref" hidden></div>
+        <div class="alert-actions" id="alert-actions">
+          <button class="alert-dismiss" type="button" id="alert-dismiss">Dismiss</button>
+          <button class="alert-answer" type="button" id="call-answer" hidden>Answer</button>
+          <button class="alert-decline" type="button" id="call-decline" hidden>Decline</button>
+        </div>
+      </div>
       <!-- Grab the right edge to resize. Exposed as a slider so it is also
            reachable from the keyboard (arrows nudge, Home/End jump). -->
       <div class="grip" id="grip"
@@ -51,63 +108,6 @@
            title="Drag to resize"></div>
     </div>
 
-    <div class="panel" id="panel" role="dialog" aria-label="Tab Tracker settings" hidden>
-
-      <!-- Who's online, so a call doesn't require opening the whole app. -->
-      <div class="peers" id="peers" hidden>
-        <div class="peers-head">
-          <span>Teammates</span>
-          <span id="peers-status"></span>
-        </div>
-        <div id="peers-list"></div>
-      </div>
-
-      <button class="row" type="button" id="open-stats">
-        <span class="row-label">Open Tab Tracker</span>
-      </button>
-
-      <div class="rule"></div>
-
-      <button class="row" type="button" id="pause">
-        <span class="row-label" id="pause-label">Pause tracking</span>
-      </button>
-
-      <div class="reset">
-        <button class="row" type="button" id="reset" aria-expanded="false">
-          <span class="row-label">Reset today's stats…</span>
-        </button>
-        <div class="confirm" id="reset-confirm" hidden>
-          <p class="confirm-text">Delete all of today's tracked time?</p>
-          <div class="confirm-actions">
-            <button class="row compact" type="button" id="reset-cancel">Cancel</button>
-            <button class="row compact danger" type="button" id="reset-go">Reset</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="rule"></div>
-
-      <button class="row" type="button" id="quit">
-        <span class="row-label">Quit Tab Tracker</span>
-      </button>
-
-    </div>
-
-    <!-- Prayer alert. Shares the panel's slot below the pill, but is driven by
-         a timer rather than by the user, so it lives outside #panel. -->
-    <div class="alert" id="alert" role="status" aria-live="polite" hidden>
-      <!-- Only shown on the verse card; the prayer-name card stays plain. -->
-      <video class="alert-scene" id="alert-scene"></video>
-      <div class="alert-name" id="alert-name"></div>
-      <p class="alert-arabic" id="alert-arabic" hidden></p>
-      <p class="alert-english" id="alert-english" hidden></p>
-      <div class="alert-ref" id="alert-ref" hidden></div>
-      <div class="alert-actions" id="alert-actions">
-        <button class="alert-dismiss" type="button" id="alert-dismiss">Dismiss</button>
-        <button class="alert-answer" type="button" id="call-answer" hidden>Answer</button>
-        <button class="alert-decline" type="button" id="call-decline" hidden>Decline</button>
-      </div>
-    </div>
   </div>
 
   <audio id="alert-audio" preload="none"></audio>

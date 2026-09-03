@@ -13,6 +13,7 @@ const daySelect = document.getElementById('day');
 const pausedFlag = document.getElementById('paused-flag');
 const elTotal = document.getElementById('t-total');
 const elApps = document.getElementById('t-apps');
+const elNow = document.getElementById('t-now');
 const appsChart = document.getElementById('apps-chart');
 const appsEmpty = document.getElementById('apps-empty');
 const appsNote = document.getElementById('apps-note');
@@ -100,7 +101,7 @@ function renderChart(container, rows, emptyEl, noteEl, limit = 12) {
 
     const value = document.createElement('div');
     value.className = 'row-value';
-    value.textContent = fmtSpan(r.activeMs);
+    value.textContent = `${fmtSpan(r.activeMs)} · ${share.toFixed(1)}%`;
 
     const track = document.createElement('div');
     track.className = 'row-track';
@@ -115,22 +116,49 @@ function renderChart(container, rows, emptyEl, noteEl, limit = 12) {
 
   // Never silently truncate — say what was left out.
   const hidden = rows.length - shown.length;
-  noteEl.textContent = hidden > 0
-    ? `top ${shown.length} by time`
-    : 'ranked by time';
+  // Only worth a line when something was left out.
+  noteEl.textContent = hidden > 0 ? `${hidden} more not shown` : '';
 }
+
+/** mm:ss, or h:mm:ss past the hour — a running clock, not a duration label. */
+function clockSpan(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(sec).padStart(2, '0');
+  return h >= 1 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/* "Tue 2 Sep · 4:41 PM". The header answers "when is this?" so the figures
+   below do not have to. */
+function stamp() {
+  const el = document.getElementById('stamp');
+  if (!el) return;
+  const d = new Date();
+  const day = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  el.textContent = `${day} · ${time}`;
+}
+setInterval(stamp, 30000);
 
 function render() {
   if (!payload) return;
+  stamp();
   const day = selectedDay;
   const appRows = toRows(payload.apps[day]);
   const siteRows = toRows(payload.sites[day]);
 
   const totalMs = appRows.reduce((sum, r) => sum + r.activeMs, 0);
-  elTotal.textContent = totalMs > 0 ? fmtDuration(totalMs) : '—';
-  elApps.textContent = appRows.length
-    ? `${appRows.length} ${appRows.length === 1 ? 'app' : 'apps'}`
-    : 'Nothing yet';
+  elTotal.textContent = totalMs > 0 ? fmtSpan(totalMs) : '—';
+  elApps.textContent = appRows.length ? String(appRows.length) : '—';
+
+  /* Only meaningful on today. On an earlier day there is no "right now", and
+     putting a live counter beside last Tuesday's totals would be a lie. */
+  const isToday = selectedDay === payload.today;
+  elNow.textContent = isToday && payload.now ? clockSpan(payload.now.activeMs) : '—';
+  elNow.title = isToday && payload.now ? payload.now.app : '';
 
   pausedFlag.hidden = !payload.paused;
 

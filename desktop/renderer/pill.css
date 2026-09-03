@@ -78,10 +78,14 @@ html, body {
   height: 100%;
 }
 
-.pill { order: 1; }
-.panel { order: 2; }
-body.panel-up .pill { order: 2; }
-body.panel-up .panel { order: 1; }
+/* Near the bottom of a display the window grows upward, so the head moves
+   below what it opened. Both are children of .pill now, so the swap happens
+   inside the capsule rather than between two cards. */
+.content { order: 1; }
+.panel, .alert { order: 2; }
+body.panel-up .content { order: 2; }
+body.panel-up .panel, body.panel-up .alert { order: 1; }
+body.panel-up .panel, body.panel-up .alert { border-top: none; border-bottom: 1px solid rgba(255,255,255,.09); }
 
 /* ---------------------------------------------------------------------------
    Pill
@@ -93,13 +97,15 @@ body.panel-up .panel { order: 1; }
   /* Inset from the window edge so the drop shadow has room to render instead
      of being clipped at the bounds. */
   margin: var(--inset-y) var(--inset-x);
-  height: calc(var(--pill-h) - 2 * var(--inset-y));
+  min-height: calc(var(--pill-h) - 2 * var(--inset-y));
   box-sizing: border-box;
 
+  /* A column, because the panel and the alert are inside it now and the pill
+     grows to hold them. */
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  gap: var(--gap);
-  padding: calc(10px * var(--scale)) var(--pad-x);
+  padding: 0;
 
   border-radius: var(--radius);
   background: var(--surface);
@@ -132,9 +138,7 @@ body.panel-up .panel { order: 1; }
  * part in the flex layout, and both are pointer-transparent so the grip and
  * the pill's own click handling are untouched.
  */
-.pill::before,
-.panel::before,
-.alert::before {
+.pill::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -150,9 +154,7 @@ body.panel-up .panel { order: 1; }
   z-index: 3;
 }
 
-.pill::after,
-.panel::after,
-.alert::after {
+.pill::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -166,6 +168,8 @@ body.panel-up .panel { order: 1; }
 
 /* Children need to clear the two surface layers. */
 .pill > *, .panel > *, .alert > * { position: relative; z-index: 2; }
+/* The scene inside the verse card still has to sit under that card's text. */
+.alert-scene { z-index: 0; }
 
 .pill:focus { outline: none; }
 .pill:focus-visible {
@@ -238,6 +242,9 @@ body.resizing .grip { opacity: 1; }
 /* ---- content ---- */
 
 .content {
+  flex: 0 0 auto;
+  min-height: calc(var(--pill-h) - 2 * var(--inset-y));
+  padding: calc(10px * var(--scale)) var(--pad-x);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -335,29 +342,27 @@ body.resizing .grip { opacity: 1; }
 .alert[hidden] { display: none; }
 
 .alert {
-  position: relative;                 /* anchors the ::before / ::after layers */
+  position: relative;
   order: 2;
   flex: 0 0 auto;
   box-sizing: border-box;
-  margin: 0 var(--inset-x) var(--inset-y);
-  padding: 14px 16px 12px;
+  margin: 0;
+  padding: 12px var(--pad-x) 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
 
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   text-align: center;
+}
+/* The prayer card reads as a list, so it aligns left; the verse card stays
+   centred, because a verse centred is how a verse is set. */
+.alert:not(.verse) {
+  align-items: flex-start;
+  text-align: left;
+  gap: 0;
 
-  border-radius: var(--radius);
-  /* Neutral, not accent-tinted: a prayer notice framed in the product green
-     read as branding rather than as a moment. */
-  background: linear-gradient(168deg, rgba(255,255,255,.075), rgba(255,255,255,.018) 48%, rgba(255,255,255,.042)),
-              rgba(15,16,19,.95);
-  box-shadow:
-    0 18px 44px -10px rgba(0, 0, 0, 0.60),
-    0 2px 5px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(20px) saturate(108%);
   color: rgba(255, 255, 255, 0.92);
 
   -webkit-app-region: no-drag;
@@ -410,6 +415,80 @@ body.alert-open .alert {
   opacity: 1;
   z-index: 1;
 }
+
+/* Prayer card: the same label-and-sentence shape as every other surface. */
+.alert-head {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.alert-clock {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.78);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.alert.verse .alert-clock { display: none; }
+
+.alert-lede {
+  width: 100%;
+  margin: 5px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  text-align: left;
+  font-size: 14.5px;
+  letter-spacing: -0.008em;
+}
+.alert-lede .lede-main { font-weight: 400; color: rgba(255, 255, 255, 0.96); }
+.alert-lede .lede-sub  { font-weight: 300; color: rgba(255, 255, 255, 0.58); }
+.alert.verse .alert-lede { display: none; }
+
+.alert-rule {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.11);
+  margin: 4px 0 2px;
+}
+
+.alert-times { width: 100%; display: flex; flex-direction: column; }
+
+.ptime {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.ptime .n {
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: -0.005em;
+  color: rgba(255, 255, 255, 0.42);
+}
+.ptime .t {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.34);
+  font-variant-numeric: tabular-nums;
+}
+/* The one that has arrived. Marked in light, like everywhere else. */
+.ptime.now .n { color: rgba(255, 255, 255, 0.98); font-weight: 400; }
+.ptime.now .t { color: rgba(255, 255, 255, 0.92); }
+
+/* The prayer name, as a label. */
+.alert-tag {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.46);
+}
+.alert.verse .alert-tag { color: rgba(255, 255, 255, 0.42); }
 
 /* The prayer card's headline. */
 .alert-name {
@@ -674,26 +753,18 @@ body.in-call .dot { background: #4DDB9B !important; }
 .panel[hidden] { display: none; }
 
 .panel {
-  position: relative;                 /* anchors the ::before / ::after layers */
+  position: relative;
   flex: 0 0 auto;
   box-sizing: border-box;
-  margin: 0 var(--inset-x) var(--inset-y);
-  padding: 6px;
+  margin: 0;
+  padding: 4px 0 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
 
   display: flex;
   flex-direction: column;
   gap: 2px;
 
-  border-radius: var(--radius);
-  /* Denser than the pill: a menu has to beat whatever it is covering. */
-  background: linear-gradient(168deg, rgba(255,255,255,.075), rgba(255,255,255,.018) 48%, rgba(255,255,255,.042)),
-              rgba(16,17,20,.93);
-  box-shadow:
-    0 18px 40px -10px rgba(0, 0, 0, 0.58),
-    0 2px 5px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(20px) saturate(108%);
-
+  /* No fill, no border, no shadow: it is part of the capsule now. */
   font-size: var(--fs-panel);
   line-height: 1.2;
   color: rgba(255, 255, 255, 0.88);
@@ -722,6 +793,82 @@ body.panel-up.panel-open .panel {
   transform: none;
   pointer-events: auto;
 }
+
+/* ---- the day's card, shown when the pill is clicked ---- */
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px 0;
+}
+
+.card-label {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.card-value {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.78);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.card-lede {
+  margin: 6px 0 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  letter-spacing: -0.008em;
+}
+.card-lede .lede-main { font-weight: 400; color: rgba(255, 255, 255, 0.96); }
+.card-lede .lede-sub  { font-weight: 300; color: rgba(255, 255, 255, 0.56); }
+
+.card-rule {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.10);
+  margin: 11px 12px 2px;
+}
+
+.card-empty {
+  margin: 10px 12px 4px;
+  font-size: 12.5px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* One app. The hairline underneath is the measure — same device as the window. */
+.papp {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  padding: 7px 12px 6px;
+}
+.papp .n {
+  font-size: 12.5px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.62);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.papp .t {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.42);
+  font-variant-numeric: tabular-nums;
+}
+.papp .bar { grid-column: 1 / -1; height: 1px; background: rgba(255,255,255,.09); overflow: hidden; }
+.papp .fl  { display: block; height: 100%; background: rgba(255,255,255,.30); }
+.papp:first-of-type .n { color: rgba(255,255,255,.96); font-weight: 400; }
+.papp:first-of-type .fl { background: rgba(255,255,255,.72); }
 
 .rule {
   height: 1px;

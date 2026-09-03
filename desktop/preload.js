@@ -79,6 +79,9 @@ contextBridge.exposeInMainWorld('tracker', {
   /** Ask the main process to pop up the pill's right-click menu. */
   showContextMenu() { ipcRenderer.send('pill:context-menu'); },
 
+  /** Today's total and the few apps the panel lists. */
+  today() { return ipcRenderer.invoke('pill:today'); },
+
   // ---- window dragging ----
   //
   // The pill is no longer a -webkit-app-region: drag surface (that would eat

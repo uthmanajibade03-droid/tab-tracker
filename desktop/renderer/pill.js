@@ -18,19 +18,16 @@ const els = {
   grip: document.getElementById('grip'),
   content: document.getElementById('content'),
   tag: document.getElementById('tag'),
+  pTotal: document.getElementById('p-total'),
+  pCount: document.getElementById('p-count'),
+  pNote: document.getElementById('p-note'),
+  pApps: document.getElementById('p-apps'),
+  pEmpty: document.getElementById('p-empty'),
   app: document.getElementById('app'),
   domain: document.getElementById('domain'),
   time: document.getElementById('time'),
 
   panel: document.getElementById('panel'),
-  pause: document.getElementById('pause'),
-  pauseLabel: document.getElementById('pause-label'),
-  reset: document.getElementById('reset'),
-  resetConfirm: document.getElementById('reset-confirm'),
-  resetCancel: document.getElementById('reset-cancel'),
-  resetGo: document.getElementById('reset-go'),
-  openStats: document.getElementById('open-stats'),
-  quit: document.getElementById('quit'),
 };
 
 const SWAP_MS = 180;        // must stay in step with the .content transition
@@ -168,8 +165,9 @@ function applyState(state) {
 const settings = { paused: false };
 
 function applyPaused(paused) {
+  // Kept as state even without a control here: the tag row reads from it, and
+  // the right-click menu toggles it.
   settings.paused = paused;
-  els.pauseLabel.textContent = paused ? 'Resume tracking' : 'Pause tracking';
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +193,9 @@ function cssVarPx(name) {
  * the reset confirmation expand the panel without either side guessing.
  */
 function panelExtraHeight() {
-  return Math.ceil(els.panel.offsetHeight + cssVarPx('--inset-y'));
+  // No gap to add any more: the panel is inside the capsule, so the extra is
+  // exactly its own height.
+  return Math.ceil(els.panel.offsetHeight);
 }
 
 /** Re-measure and tell the main process, if the answer changed. */
@@ -228,10 +228,69 @@ function openPanel() {
 
   els.panel.hidden = false;
   els.pill.setAttribute('aria-expanded', 'true');
+  fillCard();
 
   // Measure while the window is still pill-sized. The panel is laid out but
   // transparent, so nothing is visible hanging outside the window bounds.
   syncPanelHeight();
+}
+
+/*
+ * The card is filled on every open rather than kept live: the panel is shut
+ * almost all the time, and a timer refreshing a hidden list would be work
+ * nobody sees. Reading it fresh also means it can never show a stale total.
+ */
+async function fillCard() {
+  let data;
+  try { data = await window.tracker.today(); } catch { return; }
+  if (!data) return;
+
+  els.pTotal.textContent = data.totalMs > 0 ? formatSpan(data.totalMs) : '—';
+  els.pCount.textContent = data.count
+    ? `${data.count} ${data.count === 1 ? 'app' : 'apps'}`
+    : 'Nothing yet';
+  els.pNote.textContent = data.count > data.top.length
+    ? `top ${data.top.length} by time`
+    : (data.count ? 'ranked by time' : '');
+
+  els.pApps.replaceChildren();
+  els.pEmpty.hidden = data.top.length > 0;
+
+  // Bars scale against the largest, so the top one always fills the row.
+  const max = data.top.length ? data.top[0].activeMs : 1;
+  for (const a of data.top) {
+    const row = document.createElement('div');
+    row.className = 'papp';
+    row.title = `${a.name} — ${formatSpan(a.activeMs)}`;
+
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = a.name;
+
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = formatSpan(a.activeMs);
+
+    const bar = document.createElement('span');
+    bar.className = 'bar';
+    const fl = document.createElement('span');
+    fl.className = 'fl';
+    fl.style.width = `${Math.max(1, (a.activeMs / max) * 100)}%`;
+    bar.appendChild(fl);
+
+    row.append(n, t, bar);
+    els.pApps.appendChild(row);
+  }
+
+  syncPanelHeight();   // the card just changed height
+}
+
+/** Hours and minutes. A day total has no use for a seconds field. */
+function formatSpan(ms) {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h >= 1 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
 }
 
 function closePanel() {
@@ -241,7 +300,6 @@ function closePanel() {
 
   document.body.classList.remove('panel-open');
   els.pill.setAttribute('aria-expanded', 'false');
-  hideResetConfirm();
 
   // Let the fade finish before the window snaps back to pill size, otherwise
   // the panel would be clipped away mid-animation.
@@ -271,25 +329,6 @@ window.tracker.onPanelLayout(({ direction } = {}) => {
 
 // The window lost focus — the user clicked into another app.
 window.tracker.onPanelDismiss(() => closePanel());
-
-// ---------------------------------------------------------------------------
-// Reset confirmation
-// ---------------------------------------------------------------------------
-
-function showResetConfirm() {
-  if (!els.resetConfirm.hidden) return;
-  els.resetConfirm.hidden = false;
-  els.reset.setAttribute('aria-expanded', 'true');
-  syncPanelHeight(); // the panel just got taller
-  els.resetCancel.focus();
-}
-
-function hideResetConfirm() {
-  if (els.resetConfirm.hidden) return;
-  els.resetConfirm.hidden = true;
-  els.reset.setAttribute('aria-expanded', 'false');
-  syncPanelHeight();
-}
 
 // ---------------------------------------------------------------------------
 // Move and resize gestures
@@ -428,38 +467,6 @@ els.pill.addEventListener('keydown', (event) => {
 });
 
 // ---------------------------------------------------------------------------
-// Panel controls
-// ---------------------------------------------------------------------------
-
-els.pause.addEventListener('click', () => {
-  applyPaused(!settings.paused);
-  window.tracker.setPaused(settings.paused);
-});
-
-els.reset.addEventListener('click', () => {
-  if (els.resetConfirm.hidden) showResetConfirm();
-  else hideResetConfirm();
-});
-
-els.resetCancel.addEventListener('click', () => {
-  hideResetConfirm();
-  els.reset.focus();
-});
-
-els.resetGo.addEventListener('click', () => {
-  window.tracker.resetToday();
-  hideResetConfirm();
-  closePanel();
-});
-
-els.openStats.addEventListener('click', () => {
-  window.tracker.openStats();
-  closePanel();
-});
-
-els.quit.addEventListener('click', () => window.tracker.quit());
-
-// ---------------------------------------------------------------------------
 // Prayer alerts
 //
 // Two independent moments, minutes apart: the prayer name at the time itself,
@@ -472,6 +479,11 @@ const alertEls = {
   root: document.getElementById('alert'),
   name: document.getElementById('alert-name'),
   arabic: document.getElementById('alert-arabic'),
+  time: document.getElementById('alert-time'),
+  ledeMain: document.getElementById('alert-lede-main'),
+  ledeSub: document.getElementById('alert-lede-sub'),
+  rule: document.getElementById('alert-rule'),
+  times: document.getElementById('alert-times'),
   english: document.getElementById('alert-english'),
   ref: document.getElementById('alert-ref'),
   dismiss: document.getElementById('alert-dismiss'),
@@ -512,6 +524,45 @@ function closeAlert() {
  * the decode, every later one reuses it. Which scene comes from the stats
  * window's picker, so the two surfaces never disagree.
  */
+/*
+ * "19:23" -> "7:23 PM". People read a wall clock, not a timetable. The
+ * 24-hour string stays the value we compare on, because it sorts as text.
+ */
+function clockTime(hhmm) {
+  const m = /^([0-9]{1,2}):([0-9]{2})/.exec(String(hhmm || ''));
+  if (!m) return String(hhmm || '');
+  const h24 = Number(m[1]);
+  return `${h24 % 12 || 12}:${m[2]} ${h24 < 12 ? 'AM' : 'PM'}`;
+}
+
+/* The five obligatory prayers, in the order they fall. Sunrise comes back from
+   the API in the same object but is not one of them. */
+const PRAYER_ORDER = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
+function renderPrayerTimes(timings, current) {
+  alertEls.times.replaceChildren();
+  const have = PRAYER_ORDER.filter(n => timings && timings[n]);
+  if (!have.length) {
+    alertEls.times.hidden = true;
+    alertEls.rule.hidden = true;
+    return;
+  }
+  for (const name of have) {
+    const row = document.createElement('div');
+    row.className = 'ptime' + (name === current ? ' now' : '');
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = name;
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = clockTime(timings[name]);
+    row.append(n, t);
+    alertEls.times.appendChild(row);
+  }
+  alertEls.times.hidden = false;
+  alertEls.rule.hidden = false;
+}
+
 let alertScene = null;
 
 function mountAlertScene() {
@@ -547,6 +598,27 @@ function showAlert(payload) {
     ? (verse && verse.surahName ? verse.surahName : 'Reflection')
     : `${payload.prayer}`;
 
+  if (isVerse) {
+    alertEls.time.textContent = '';
+    alertEls.times.hidden = true;
+    alertEls.rule.hidden = true;
+  } else {
+    const timings = payload.timings || null;
+    const own = timings && timings[payload.prayer];
+    alertEls.time.textContent = own ? clockTime(own) : '';
+    // A notice borrows this card too, and has no prayer to list.
+    if (payload.kind === 'notice') {
+      alertEls.ledeMain.textContent = payload.message || '';
+      alertEls.ledeSub.textContent = '';
+      alertEls.times.hidden = true;
+      alertEls.rule.hidden = true;
+    } else {
+      alertEls.ledeMain.textContent = 'It is time';
+      alertEls.ledeSub.textContent = 'for prayer';
+      renderPrayerTimes(timings, payload.prayer);
+    }
+  }
+
   if (isVerse && verse) {
     alertEls.arabic.textContent = verse.arabic || '';
     alertEls.arabic.hidden = !verse.arabic;
@@ -555,21 +627,17 @@ function showAlert(payload) {
     alertEls.ref.textContent = verse.reference ? `Quran ${verse.reference}` : '';
     alertEls.ref.hidden = !verse.reference;
   } else {
+    // The sentence lives in the lede row now, so the body stays empty here.
     alertEls.arabic.hidden = true;
-    /* A notice supplies its own line; a prayer name card always says the same
-       thing. Empty message means "show no second line at all". */
-    const body = payload.kind === 'notice'
-      ? (payload.message || '')
-      : 'It is time for prayer.';
-    alertEls.english.textContent = body;
-    alertEls.english.hidden = !body;
+    alertEls.english.hidden = true;
     alertEls.ref.hidden = true;
   }
 
   // Unhide before measuring — offsetHeight is 0 on a hidden element, and the
   // main process needs the real height to size the window.
   alertEls.root.hidden = false;
-  const height = Math.ceil(alertEls.root.offsetHeight + cssVarPx('--inset-y'));
+  // Inside the capsule now, so the extra is the card's own height.
+  const height = Math.ceil(alertEls.root.offsetHeight);
   window.tracker.alertOpen(height);
 
   requestAnimationFrame(() => document.body.classList.add('alert-open'));
@@ -856,7 +924,6 @@ window.tracker.onVoiceNotice((n) => {
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape' || !panel.open) return;
   event.preventDefault();
-  if (!els.resetConfirm.hidden) { hideResetConfirm(); els.reset.focus(); return; }
   closePanel();
 });
 

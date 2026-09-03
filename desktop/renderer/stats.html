@@ -15,6 +15,7 @@
 <header class="bar">
   <h1>Tab Tracker</h1>
   <div class="bar-right">
+    <span class="stamp" id="stamp"></span>
     <span class="paused-flag" id="paused-flag" hidden>Tracking paused</span>
     <label class="day-pick">
       <span class="sr-only">Day</span>
@@ -25,17 +26,26 @@
 
 <main>
   <section class="panel" aria-labelledby="h-apps">
-    <div class="head-row">
-      <h2 id="h-apps">Today so far</h2>
-      <span class="head-value" id="t-total">—</span>
+    <h2 id="h-apps" class="sr-only">Today</h2>
+    <!-- Three figures, as columns rather than boxes. -->
+    <div class="figures">
+      <div class="figure">
+        <div class="figure-label">Tracked today</div>
+        <div class="figure-value" id="t-total">—</div>
+      </div>
+      <div class="figure">
+        <div class="figure-label">Applications</div>
+        <div class="figure-value" id="t-apps">—</div>
+      </div>
+      <div class="figure">
+        <div class="figure-label">Right now</div>
+        <div class="figure-value live" id="t-now">—</div>
+      </div>
     </div>
-    <p class="lede">
-      <span class="lede-main" id="t-apps">—</span>
-      <span class="lede-sub" id="apps-note"></span>
-    </p>
     <div class="rule"></div>
     <div id="apps-chart"></div>
     <p class="empty" id="apps-empty" hidden>Nothing tracked on this day.</p>
+    <p class="more" id="apps-note"></p>
   </section>
 
   <section class="panel" aria-labelledby="h-prayer">
