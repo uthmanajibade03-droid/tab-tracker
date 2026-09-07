@@ -36,15 +36,6 @@ body {
   /* Product accent. Used only for the dot and focus rings. */
   --accent: #209C64;
   --accent-light: #4DDB9B;
-
-  /* One glass recipe, shared by the pill, the panel and the alert so the three
-     read as the same material. The fill stays semi-opaque on purpose: see the
-     note in patch-glass.js about backdrop-filter in a transparent window. */
-  --surface: linear-gradient(168deg, rgba(255,255,255,.085), rgba(255,255,255,.022) 48%, rgba(255,255,255,.050)),
-             rgba(16,17,20,.78);
-  --edge-top: rgba(255,255,255,.42);
-  --edge-mid: rgba(255,255,255,.055);
-  --radius: calc(16px * var(--scale));
 }
 
 html, body {
@@ -78,14 +69,10 @@ html, body {
   height: 100%;
 }
 
-/* Near the bottom of a display the window grows upward, so the head moves
-   below what it opened. Both are children of .pill now, so the swap happens
-   inside the capsule rather than between two cards. */
-.content { order: 1; }
-.panel, .alert { order: 2; }
-body.panel-up .content { order: 2; }
-body.panel-up .panel, body.panel-up .alert { order: 1; }
-body.panel-up .panel, body.panel-up .alert { border-top: none; border-bottom: 1px solid rgba(255,255,255,.09); }
+.pill { order: 1; }
+.panel { order: 2; }
+body.panel-up .pill { order: 2; }
+body.panel-up .panel { order: 1; }
 
 /* ---------------------------------------------------------------------------
    Pill
@@ -97,27 +84,23 @@ body.panel-up .panel, body.panel-up .alert { border-top: none; border-bottom: 1p
   /* Inset from the window edge so the drop shadow has room to render instead
      of being clipped at the bounds. */
   margin: var(--inset-y) var(--inset-x);
-  min-height: calc(var(--pill-h) - 2 * var(--inset-y));
+  height: calc(var(--pill-h) - 2 * var(--inset-y));
   box-sizing: border-box;
 
-  /* A column, because the panel and the alert are inside it now and the pill
-     grows to hold them. */
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  padding: 0;
+  align-items: center;
+  gap: var(--gap);
+  padding: 0 var(--pad-x);
 
-  border-radius: var(--radius);
-  background: var(--surface);
-  /* Ambient lift, a contact shadow so it sits on the screen rather than
-     hovering above it, and the lit top edge. The perimeter hairline is a
-     gradient and lives in ::before — a flat inset ring reads as a stroked
-     rectangle, not as light on an edge. */
+  border-radius: 999px;
+  background: rgba(20, 22, 26, 0.82);
+  /* Two layered shadows: a soft ambient drop shadow for lift, and an inset
+     hairline that reads as a light catching the top edge of the glass. */
   box-shadow:
-    0 12px 30px -8px rgba(0, 0, 0, 0.52),
-    0 2px 5px rgba(0, 0, 0, 0.30),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(18px) saturate(108%);
+    0 8px 24px rgba(0, 0, 0, 0.38),
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(14px) saturate(140%);
 
   font-size: var(--fs);
   line-height: 1;
@@ -132,44 +115,6 @@ body.panel-up .panel, body.panel-up .alert { border-top: none; border-bottom: 1p
   -webkit-app-region: no-drag;
   cursor: default;
 }
-
-/*
- * Perimeter light and grain. Both are absolutely positioned so they take no
- * part in the flex layout, and both are pointer-transparent so the grip and
- * the pill's own click handling are untouched.
- */
-.pill::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(148deg,
-    var(--edge-top), rgba(255,255,255,.11) 32%, var(--edge-mid) 60%, rgba(255,255,255,.20));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.pill::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 4;
-  opacity: .26;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
-}
-
-/* Children need to clear the two surface layers. */
-.pill > *, .panel > *, .alert > * { position: relative; z-index: 2; }
-/* The scene inside the verse card still has to sit under that card's text. */
-.alert-scene { z-index: 0; }
 
 .pill:focus { outline: none; }
 .pill:focus-visible {
@@ -228,10 +173,12 @@ body.resizing .grip { opacity: 1; }
 
 .dot.active {
   background: var(--accent);
+  box-shadow: 0 0 8px rgba(32, 156, 100, 0.65);
 }
 
 .dot.paused {
-  background: #E0A33C;
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
 }
 
 .dot.idle {
@@ -242,13 +189,9 @@ body.resizing .grip { opacity: 1; }
 /* ---- content ---- */
 
 .content {
-  flex: 0 0 auto;
-  min-height: calc(var(--pill-h) - 2 * var(--inset-y));
-  padding: calc(8px * var(--scale)) var(--pad-x);
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: calc(5px * var(--scale));
+  align-items: baseline;
+  gap: calc(var(--gap) * 0.7);
   min-width: 0; /* lets .app actually shrink so its ellipsis can trigger */
   flex: 1 1 auto;
 
@@ -264,37 +207,9 @@ body.resizing .grip { opacity: 1; }
   transform: translateY(-3px);
 }
 
-/* Label row: what the tracker is doing, and what the number means. */
-.meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: calc(12px * var(--scale));
-  min-width: 0;
-}
-
-.tag {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: calc(9px * var(--scale));
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.44);
-  white-space: nowrap;
-  transition: color 220ms ease;
-}
-/* Paused is the one state worth colouring: it means the number has stopped. */
-.tag[data-status="paused"] { color: #E0A33C; }
-
-.headline {
-  display: flex;
-  align-items: baseline;
-  gap: calc(7px * var(--scale));
-  min-width: 0;
-}
-
 .app {
-  font-weight: 400;
-  letter-spacing: -0.008em;
+  font-weight: 600;
+  letter-spacing: 0.1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -302,9 +217,8 @@ body.resizing .grip { opacity: 1; }
 }
 
 .domain {
-  font-weight: 300;
-  letter-spacing: -0.008em;
-  color: rgba(255, 255, 255, 0.55);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.62);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -313,8 +227,14 @@ body.resizing .grip { opacity: 1; }
   min-width: 0;
 }
 
+.sep {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.30);
+}
+
 .time {
   flex: 0 0 auto;
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
@@ -342,28 +262,26 @@ body.resizing .grip { opacity: 1; }
 .alert[hidden] { display: none; }
 
 .alert {
-  position: relative;
   order: 2;
   flex: 0 0 auto;
   box-sizing: border-box;
-  margin: 0;
-  padding: 12px var(--pad-x) 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  margin: 0 var(--inset-x) var(--inset-y);
+  padding: 14px 16px 12px;
 
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   text-align: center;
-}
-/* The prayer card reads as a list, so it aligns left; the verse card stays
-   centred, because a verse centred is how a verse is set. */
-.alert:not(.verse) {
-  align-items: flex-start;
-  text-align: left;
-  gap: 0;
 
-  color: rgba(255, 255, 255, 0.92);
+  border-radius: calc(14px * var(--scale));
+  background: rgba(18, 26, 22, 0.95);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.46),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 1px rgba(77, 219, 155, 0.22);
+  backdrop-filter: blur(18px) saturate(140%);
+  color: rgba(255, 255, 255, 0.9);
 
   -webkit-app-region: no-drag;
 
@@ -385,128 +303,11 @@ body.alert-open .alert {
   transform: none;
 }
 
-/*
- * The scene behind a verse. Sits under the text inside the card, above the
- * card's own fill, and only while the card is the verse variant — a landscape
- * behind "Maghrib · it is time for prayer" would be noise, but behind a verse
- * you are meant to sit with for twenty-five seconds it is the point.
- */
-.alert-scene {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-  z-index: 0;
-  opacity: 0;
-  transition: opacity 600ms ease;
-  pointer-events: none;
-}
-.alert.verse .alert-scene { opacity: 1; }
-/* Everything the card paints has to clear it. */
-.alert > *:not(.alert-scene) { position: relative; z-index: 2; }
-/* Over a picture the card needs its own floor, or a bright frame washes the
-   Arabic out. */
-.alert.verse::after {
-  background-image: none;
-  background: linear-gradient(rgba(10,11,12,.52), rgba(10,11,12,.68));
-  mix-blend-mode: normal;
-  opacity: 1;
-  z-index: 1;
-}
-
-/* Prayer card: the same label-and-sentence shape as every other surface. */
-.alert-head {
-  width: 100%;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.alert-clock {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.78);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.alert.verse .alert-clock { display: none; }
-
-.alert-lede {
-  width: 100%;
-  margin: 5px 0 0;
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  text-align: left;
-  font-size: 14.5px;
-  letter-spacing: -0.008em;
-}
-.alert-lede .lede-main { font-weight: 400; color: rgba(255, 255, 255, 0.96); }
-.alert-lede .lede-sub  { font-weight: 300; color: rgba(255, 255, 255, 0.58); }
-.alert.verse .alert-lede { display: none; }
-
-.alert-rule {
-  width: 100%;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.11);
-  margin: 4px 0 2px;
-}
-
-.alert-times { width: 100%; display: flex; flex-direction: column; }
-
-.ptime {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
-}
-.ptime .n {
-  font-size: 13px;
-  font-weight: 300;
-  letter-spacing: -0.005em;
-  color: rgba(255, 255, 255, 0.42);
-}
-.ptime .t {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.34);
-  font-variant-numeric: tabular-nums;
-}
-/* The one that has arrived. Marked in light, like everywhere else. */
-.ptime.now .n { color: rgba(255, 255, 255, 0.98); font-weight: 400; }
-.ptime.now .t { color: rgba(255, 255, 255, 0.92); }
-
-/* The prayer name, as a label. */
-.alert-tag {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.46);
-}
-.alert.verse .alert-tag { color: rgba(255, 255, 255, 0.42); }
-
-/* The prayer card's headline. */
 .alert-name {
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.004em;
-  color: rgba(255, 255, 255, 0.96);
-}
-
-/* On the verse card the same element names the source, so it steps back into
-   a label and lets the Arabic carry the card. */
-.alert.verse .alert-name {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 9.5px;
-  font-weight: 400;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #7fe8b8;
 }
 
 /* Mushaf-style faces when present, then anything with real Arabic coverage. */
@@ -524,18 +325,16 @@ body.alert-open .alert {
 .alert-english {
   margin: 0;
   font-size: 12.5px;
-  font-weight: 300;
-  line-height: 1.58;
-  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
   max-width: 52ch;
 }
 
 .alert-ref {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.34);
+  color: rgba(127, 232, 184, 0.75);
 }
 
 .alert-actions {
@@ -616,13 +415,10 @@ body.alert-open .alert {
 }
 
 /* The pill itself takes on the alert's tint while one is showing. */
-/* The capsule brightens slightly while a card is open, so the two read as one
-   object — but in light, not in brand colour. */
 body.alert-open .pill {
   box-shadow:
-    0 12px 30px -8px rgba(0, 0, 0, 0.52),
-    0 2px 5px rgba(0, 0, 0, 0.30),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    0 10px 30px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(77, 219, 155, 0.35);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -636,22 +432,21 @@ body.alert-open .pill {
 .peers[hidden] { display: none; }
 
 .peers {
-  padding: 10px var(--pad-x) 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
-  margin-top: 6px;
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 2px;
 }
 
 .peers-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 0.22em;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-  padding: 0 0 7px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 2px 0 6px;
 }
 
 .peer-row {
@@ -754,18 +549,23 @@ body.in-call .dot { background: #4DDB9B !important; }
 .panel[hidden] { display: none; }
 
 .panel {
-  position: relative;
   flex: 0 0 auto;
   box-sizing: border-box;
-  margin: 0;
-  padding: 4px 0 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  margin: 0 var(--inset-x) var(--inset-y);
+  padding: 6px;
 
   display: flex;
   flex-direction: column;
   gap: 2px;
 
-  /* No fill, no border, no shadow: it is part of the capsule now. */
+  border-radius: calc(14px * var(--scale));
+  background: rgba(20, 22, 26, 0.94);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.46),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(18px) saturate(140%);
+
   font-size: var(--fs-panel);
   line-height: 1.2;
   color: rgba(255, 255, 255, 0.88);
@@ -794,82 +594,6 @@ body.panel-up.panel-open .panel {
   transform: none;
   pointer-events: auto;
 }
-
-/* ---- the day's card, shown when the pill is clicked ---- */
-
-.card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 12px 0;
-}
-
-.card-label {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-.card-value {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.78);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.card-lede {
-  margin: 6px 0 0;
-  padding: 0 12px;
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  flex-wrap: wrap;
-  font-size: 14px;
-  letter-spacing: -0.008em;
-}
-.card-lede .lede-main { font-weight: 400; color: rgba(255, 255, 255, 0.96); }
-.card-lede .lede-sub  { font-weight: 300; color: rgba(255, 255, 255, 0.56); }
-
-.card-rule {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.10);
-  margin: 11px 12px 2px;
-}
-
-.card-empty {
-  margin: 10px 12px 4px;
-  font-size: 12.5px;
-  font-weight: 300;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* One app. The hairline underneath is the measure — same device as the window. */
-.papp {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 12px;
-  padding: 7px 12px 6px;
-}
-.papp .n {
-  font-size: 12.5px;
-  font-weight: 300;
-  color: rgba(255, 255, 255, 0.62);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
-}
-.papp .t {
-  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.42);
-  font-variant-numeric: tabular-nums;
-}
-.papp .bar { grid-column: 1 / -1; height: 1px; background: rgba(255,255,255,.09); overflow: hidden; }
-.papp .fl  { display: block; height: 100%; background: rgba(255,255,255,.30); }
-.papp:first-of-type .n { color: rgba(255,255,255,.96); font-weight: 400; }
-.papp:first-of-type .fl { background: rgba(255,255,255,.72); }
 
 .rule {
   height: 1px;

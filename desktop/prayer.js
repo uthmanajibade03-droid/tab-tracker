@@ -233,8 +233,6 @@ function fireName(name) {
     prayer: name,
     seconds: store.alert.nameSeconds,
     audioUrl: store.alert.adhanUrl || '',
-    // Already in memory — an alert can only be scheduled from a day's timings.
-    timings: lastTimings || null,
   });
   // The verse is a separate, later moment — not a second page of the same card.
   const delayMs = Math.max(1000, (store.alert.verseDelayMinutes ?? 5) * 60000);
@@ -328,8 +326,6 @@ async function runDemo() {
     prayer: name,
     seconds: 8,
     audioUrl: store.alert.adhanUrl || '',
-    // The preview should look like the real thing, times included.
-    timings: lastTimings || null,
     demo: true,
   });
   // Long enough to read the name card, short enough to not be a wait.

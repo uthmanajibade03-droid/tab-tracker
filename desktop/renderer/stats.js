@@ -13,7 +13,7 @@ const daySelect = document.getElementById('day');
 const pausedFlag = document.getElementById('paused-flag');
 const elTotal = document.getElementById('t-total');
 const elApps = document.getElementById('t-apps');
-const elNow = document.getElementById('t-now');
+const elTop = document.getElementById('t-top');
 const appsChart = document.getElementById('apps-chart');
 const appsEmpty = document.getElementById('apps-empty');
 const appsNote = document.getElementById('apps-note');
@@ -45,19 +45,6 @@ function fmtDay(key, today) {
   const yKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
   if (key === yKey) return 'Yesterday';
   return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-}
-
-/*
- * A day total in hours and minutes. fmtDuration keeps seconds, which is right
- * for the pill's live counter and wrong here — the seconds field is always 00
- * by the time a day is worth reading.
- */
-function fmtSpan(ms) {
-  const mins = Math.max(0, Math.round(ms / 60000));
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h >= 1) return `${h}h ${String(m).padStart(2, '0')}m`;
-  return `${m}m`;
 }
 
 /** {name, activeMs} rows, biggest first, zero-time entries dropped. */
@@ -101,7 +88,7 @@ function renderChart(container, rows, emptyEl, noteEl, limit = 12) {
 
     const value = document.createElement('div');
     value.className = 'row-value';
-    value.textContent = `${fmtSpan(r.activeMs)} · ${share.toFixed(1)}%`;
+    value.textContent = `${fmtDuration(r.activeMs)} · ${share.toFixed(1)}%`;
 
     const track = document.createElement('div');
     track.className = 'row-track';
@@ -116,49 +103,22 @@ function renderChart(container, rows, emptyEl, noteEl, limit = 12) {
 
   // Never silently truncate — say what was left out.
   const hidden = rows.length - shown.length;
-  // Only worth a line when something was left out.
-  noteEl.textContent = hidden > 0 ? `${hidden} more not shown` : '';
+  noteEl.textContent = hidden > 0
+    ? `top ${shown.length} of ${rows.length}`
+    : `${rows.length} tracked`;
 }
-
-/** mm:ss, or h:mm:ss past the hour — a running clock, not a duration label. */
-function clockSpan(ms) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const sec = total % 60;
-  const mm = String(m).padStart(2, '0');
-  const ss = String(sec).padStart(2, '0');
-  return h >= 1 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-/* "Tue 2 Sep · 4:41 PM". The header answers "when is this?" so the figures
-   below do not have to. */
-function stamp() {
-  const el = document.getElementById('stamp');
-  if (!el) return;
-  const d = new Date();
-  const day = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  el.textContent = `${day} · ${time}`;
-}
-setInterval(stamp, 30000);
 
 function render() {
   if (!payload) return;
-  stamp();
   const day = selectedDay;
   const appRows = toRows(payload.apps[day]);
   const siteRows = toRows(payload.sites[day]);
 
   const totalMs = appRows.reduce((sum, r) => sum + r.activeMs, 0);
-  elTotal.textContent = totalMs > 0 ? fmtSpan(totalMs) : '—';
-  elApps.textContent = appRows.length ? String(appRows.length) : '—';
-
-  /* Only meaningful on today. On an earlier day there is no "right now", and
-     putting a live counter beside last Tuesday's totals would be a lie. */
-  const isToday = selectedDay === payload.today;
-  elNow.textContent = isToday && payload.now ? clockSpan(payload.now.activeMs) : '—';
-  elNow.title = isToday && payload.now ? payload.now.app : '';
+  elTotal.textContent = totalMs > 0 ? fmtDuration(totalMs) : '—';
+  elApps.textContent = appRows.length || '—';
+  elTop.textContent = appRows.length ? appRows[0].name : '—';
+  elTop.title = appRows.length ? appRows[0].name : '';
 
   pausedFlag.hidden = !payload.paused;
 
@@ -473,19 +433,6 @@ function renderPrayer(s) {
     : 'off';
 }
 
-/**
- * "19:25" -> "7:25 PM". Returns the input untouched if it is not a time, so a
- * blank or an error string from the API passes through rather than becoming
- * "NaN:undefined".
- */
-function clockTime(hhmm) {
-  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || ''));
-  if (!m) return String(hhmm || '');
-  const h24 = Number(m[1]);
-  const suffix = h24 < 12 ? 'AM' : 'PM';
-  return `${h24 % 12 || 12}:${m[2]} ${suffix}`;
-}
-
 /** Today's five times, with the next one marked. */
 async function renderTimes() {
   const t = await window.stats.prayerTimes();
@@ -511,7 +458,7 @@ async function renderTimes() {
     n.textContent = name;
     const v = document.createElement('div');
     v.className = 't';
-    v.textContent = clockTime(hhmm);
+    v.textContent = hhmm;
     cell.append(n, v);
     P.times.appendChild(cell);
   }
@@ -589,35 +536,3 @@ setInterval(() => {
 }, 1000);
 
 refresh();
-
-/* ───────── ambient scene ──────────────────────────────────────────────
- * A render of one place going from morning to night, held on the frame that
- * matches the clock. Sunrise and sunset come from the prayer timings the app
- * already fetches for the user's coordinates, so it tracks their actual sky
- * rather than a latitude guessed here.
- */
-let sceneHandle = null;
-
-async function initScene() {
-  const el = document.getElementById('scene');
-  const pick = document.getElementById('scene-pick');
-  if (!el || !pick || !window.Scene) return;
-
-  const ctx = await window.stats.sceneContext();
-  sceneHandle = window.Scene.attach(el, { sceneId: ctx.id, timings: ctx.timings });
-
-  for (const sc of window.Scene.SCENES) {
-    const o = document.createElement('option');
-    o.value = sc.id;
-    o.textContent = sc.name;
-    pick.appendChild(o);
-  }
-  pick.value = sceneHandle.sceneId;
-
-  pick.addEventListener('change', () => {
-    sceneHandle.setScene(pick.value);
-    window.stats.setScene(pick.value);
-  });
-}
-
-initScene();
